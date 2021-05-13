@@ -15,7 +15,7 @@ int sieve(int read_fd, int modulo) {
 
     if (modulo == END + 1) {  // End of the process
         close(read_fd);
-        exit(0);
+        return 0;
     }
     else {
         pipe(p);
@@ -23,6 +23,7 @@ int sieve(int read_fd, int modulo) {
             close(read_fd);
             close(p[1]);
             sieve(p[0], modulo + 1);
+            return 0;
         }
         else {
             close(p[0]);
@@ -30,7 +31,7 @@ int sieve(int read_fd, int modulo) {
                 data = *(int *)buf;
                 mod = data % modulo;     
                 if (mod == 0 && data == modulo) {
-                    printf("%d\n", data);
+                    printf("prime %d\n" , data);
                 }
                 else if (mod == 0 && data != modulo)
                 {
@@ -40,12 +41,12 @@ int sieve(int read_fd, int modulo) {
                     write(p[1], buf, 4);
                 }
             }
+            close(read_fd);
+            close(p[1]);
+            wait(&pid);
         }
-        close(read_fd);
-        close(p[1]);
-        wait(&pid);
+        return 0;
     }
-    exit(0);
 }
 
 int main(int argc, char *argv[]) {
@@ -61,13 +62,14 @@ int main(int argc, char *argv[]) {
         for (i = START; i < 35; i++) {
             write(p[1], &i, 4);
         }
+        close(p[1]);
+        exit(0);
     }
     else {
         // Child only needs to read.
         close(p[1]);
         sieve(p[0], START);
+        wait(&pid);
+        exit(0);
     }
-    close(p[1]);
-    wait(&pid);
-    exit(0);
 }
