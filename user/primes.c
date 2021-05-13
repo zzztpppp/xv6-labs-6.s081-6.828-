@@ -31,13 +31,16 @@ int sieve(int read_fd, int modulo) {
                 data = *(int *)buf;
                 mod = data % modulo;     
                 if (mod == 0 && data == modulo) {
+                    // Find a prime
                     printf("prime %d\n" , data);
                 }
                 else if (mod == 0 && data != modulo)
                 {
+                    // Drop a non-prime
                     continue;
                 }
                 else {
+                    // To be determined in next sieve
                     write(p[1], buf, 4);
                 }
             }
