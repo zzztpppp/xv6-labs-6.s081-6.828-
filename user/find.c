@@ -38,11 +38,16 @@ int find(char *path, char *target) {
     case T_FILE:
         if (match(path, target))
             printf("%s\n", path);
+        close(fd);
         break;
     case T_DIR:
         while (read(fd, &de, sizeof(de)) == sizeof(de)) {
             // Ignore ../ and ./
-            if (de.inum == 1) continue;
+            if (!strcmp(path + strlen(path) - 3, "/.."))
+                continue;
+            if (!strcmp(path + strlen(path) - 2, "/."))
+                continue;
+
             memmove(buf, path, strlen(path));
             p = buf + strlen(path);
             *p++ = '/';
@@ -50,6 +55,7 @@ int find(char *path, char *target) {
             p[DIRSIZ] = 0;
             find(buf, target);
         }
+        close(fd);
         break;
     
     default:
