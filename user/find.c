@@ -42,17 +42,21 @@ int find(char *path, char *target) {
         break;
     case T_DIR:
         while (read(fd, &de, sizeof(de)) == sizeof(de)) {
-            // Ignore ../ and ./
-            if (!strcmp(path + strlen(path) - 3, "/.."))
-                continue;
-            if (!strcmp(path + strlen(path) - 2, "/."))
-                continue;
-
             memmove(buf, path, strlen(path));
             p = buf + strlen(path);
             *p++ = '/';
             memmove(p, de.name, DIRSIZ);
             p[DIRSIZ] = 0;
+            printf("Dirname is %s\n", buf);
+
+            // Ignore ../ and ./
+            if (de.inum == 0) 
+                continue;
+            if (!strcmp(buf + strlen(buf) - 3, "/.."))
+                continue;
+            if (!strcmp(buf + strlen(buf) - 2, "/."))
+                continue;
+
             find(buf, target);
         }
         close(fd);
