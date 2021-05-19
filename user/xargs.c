@@ -12,12 +12,13 @@ static int nleft = 0;
 int readline(char *line) {
     char *p = line;
 
-    if (nleft == 0)
+    if (nleft == 0) {
         nleft = read(0, io_buf, 4096); 
-
-    while (nleft > 0) {
         nread = 0;
-        for (; nread < nleft; nread++) {
+    }
+
+    while (nread < nleft) {
+        for (;; nread++) {
             if (io_buf[nread] == '\n') {
                 nread++;
                 break;
@@ -25,11 +26,10 @@ int readline(char *line) {
             *p++ = io_buf[nread];
         }
         *p = 0;
-        nleft -= nread;
         return 1;
     }
 
-    if (nleft < 0) {
+    if (nleft < nread) {
         return -1;
     }
 
@@ -38,17 +38,19 @@ int readline(char *line) {
 }
 
 void print_argv(char **argv) {
-    char *p = argv[0];
-    while (p != 0) {
-        printf("%p\n", p);
+    for (int i = 0; i < 5; i++) {
+        printf("%p %s\n", argv[i], argv[i]);
+        if (!argv[i]) break;
     }
+    printf("\n");
     return;
 }
 
 int main(int argc, char *argv[]) {
 
     char buf[512];    // Argument values are limited to be 128-bytes long
-    int pid;
+    char *new_argv[MAXARG];
+    int pid, i;
 
     if (argc < 2) {
         fprintf(2, "Usage: xargs <command>");
@@ -56,11 +58,14 @@ int main(int argc, char *argv[]) {
     }
 
     while (readline(buf) > 0) {
-        print_argv(argv);
-        argv[argc] = buf;
-        argv[argc + 1] = 0;
+        memset(new_argv, 0, MAXARG);
+        for (i = 1; i < argc; i++) {
+            new_argv[i - 1] = argv[i];
+        }
+        new_argv[i - 1] = buf;
+
         if ((pid = fork()) == 0) {
-            exec(argv[1], argv + 1);
+            exec(new_argv[0], new_argv);
             fprintf(2, "Execution error!\n");
             exit(1);
         }
