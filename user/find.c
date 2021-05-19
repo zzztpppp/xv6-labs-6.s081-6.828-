@@ -47,7 +47,6 @@ int find(char *path, char *target) {
             *p++ = '/';
             memmove(p, de.name, DIRSIZ);
             p[DIRSIZ] = 0;
-            printf("Dirname is %s\n", buf);
 
             // Ignore ../ and ./
             if (de.inum == 0) 
