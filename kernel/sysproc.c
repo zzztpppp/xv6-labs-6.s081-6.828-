@@ -99,7 +99,7 @@ sys_uptime(void)
 uint64
 sys_trace(void)
 {
-  uint scall;
+  int scall;
   if (argint(0, &scall) < 0)
       return -1;
   myproc()->trace_mask = scall;
