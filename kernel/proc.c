@@ -695,3 +695,19 @@ procdump(void)
     printf("\n");
   }
 }
+
+// Return the number of process in use
+int
+used_nproc(void) {
+  struct proc *p;
+  int nproc = 0;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state != UNUSED)
+      nproc++;
+    release(&p->lock);
+  }
+
+  return nproc;
+}
