@@ -88,7 +88,7 @@ nfree(void)
   int n = 0;
   struct run *r;
   
-  for (r = kmem.freelist; !r; r = r->next)
+  for (r = kmem.freelist; r; r = r->next)
     n++;
 
   return n*PGSIZE;
