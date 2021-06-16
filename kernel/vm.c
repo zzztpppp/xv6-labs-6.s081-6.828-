@@ -47,12 +47,26 @@ kvminit()
   kvmmap(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 }
 
+// Return a referrence to the global current kernel pagetable
+// used by allocproc to get a per-process kernel pagetable
+pagetable_t kvmref() {
+  return kernel_pagetable;
+}
+
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
 void
 kvminithart()
 {
   w_satp(MAKE_SATP(kernel_pagetable));
+  sfence_vma();
+}
+
+// Switch h/w page table register to a given page table,
+// and enable paging
+void 
+kvminithart_p(pagetable_t pagetable) {
+  w_satp(MAKE_SATP(pagetable));
   sfence_vma();
 }
 

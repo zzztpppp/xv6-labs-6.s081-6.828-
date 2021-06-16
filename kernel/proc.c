@@ -121,6 +121,14 @@ found:
     return 0;
   }
 
+  // A referrence to the global kerbel pagetable
+  p->kpagetbale = kvmref();
+  if (p->kpagetbale == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -142,6 +150,7 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  p->kpagetbale = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -473,6 +482,9 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        // Install per-process kerbel pagetable and enable paging
+        kvminithart_p(p->kpagetbale);
+
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
@@ -483,6 +495,9 @@ scheduler(void)
       }
       release(&p->lock);
     }
+
+    if (found == 0)    // Use global kernel pagetable when no process' running
+      kvminithart();
 #if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
