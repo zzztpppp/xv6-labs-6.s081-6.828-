@@ -20,6 +20,7 @@ static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
+extern char etext[]; // kernel.ld sets this to end of kernel code.
 
 // initialize the proc table at boot time.
 void
@@ -121,13 +122,21 @@ found:
     return 0;
   }
 
-  // A referrence to the global kerbel pagetable
-  p->kpagetbale = kvmref();
+  // A copy of the global kernel pagetable
+  p->kpagetbale = ukvminit();
   if (p->kpagetbale == 0) {
     freeproc(p);
     release(&p->lock);
     return 0;
   }
+  // Set up kernel stack 
+  char *pa = kalloc();
+  if (pa == 0) {
+    panic("kalloc");
+  }
+  uint64 va = KSTACK((int) 0);
+  mappages(p->kpagetbale, va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  p->kstack = va;
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -150,6 +159,9 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
+  if (p->kpagetbale) {
+    proc_freekpagetable(p->kpagetbale);
+  }
   p->kpagetbale = 0;
   p->sz = 0;
   p->pid = 0;
@@ -202,6 +214,21 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
+}
+
+// Free a process's kernel page table, don't free
+// physical memory.
+void
+proc_freekpagetable(pagetable_t pagetable) {
+  uvmunmap(pagetable, UART0, 1, 0);
+  uvmunmap(pagetable, VIRTIO0, 1, 0);
+  uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+  uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+  uvmunmap(pagetable, TRAMPOLINE, (uint64)trampoline / PGSIZE, 0);
+  // Only kstack need to be physically freed.
+  uvmunmap(pagetable, KSTACK((int) 0), 1, 1);
+  uvmfree(pagetable, 0);
+  return;
 }
 
 // a user program that calls exec("/init")
