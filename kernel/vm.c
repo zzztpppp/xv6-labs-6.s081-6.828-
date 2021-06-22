@@ -63,23 +63,23 @@ pagetable_t ukvminit() {
   // at booting
 
   // uart registers
-  mappages(pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  mappages(pagetable, UART0, PGSIZE, UART0, PTE_R | PTE_W);
 
   // virtio mmio disk interface
-  mappages(pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  mappages(pagetable, VIRTIO0,  PGSIZE, VIRTIO0, PTE_R | PTE_W);
 
   // PLIC
-  mappages(pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  mappages(pagetable, PLIC, 0x400000, PLIC, PTE_R | PTE_W);
 
   // map kernel text executable and read-only.
-  mappages(pagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+  mappages(pagetable, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X);
 
   // map kernel data and the physical RAM we'll make use of.
-  mappages(pagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+  mappages(pagetable, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W);
 
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
-  mappages(pagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+  mappages(pagetable, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X);
 
   return pagetable;
 }
