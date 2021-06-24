@@ -31,6 +31,11 @@ procinit(void)
   initlock(&pid_lock, "nextpid");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
+      char *pa = kalloc();
+      if(pa == 0)
+        panic("kalloc");
+      uint64 va = KSTACK((int) (p - proc));
+      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
   }
   kvminithart();
 }
@@ -120,12 +125,8 @@ found:
     return 0;
   }
   // Set up kernel stack 
-  char *pa = kalloc();
-  if (pa == 0) {
-    panic("kalloc");
-  }
   uint64 va = KSTACK((int) (p - proc));
-  kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+  uint64 pa = kvmpa(va);
   mappages(p->kpagetbale, va, PGSIZE, (uint64)pa, PTE_R | PTE_W);
   p->kstack = va;
 
@@ -151,7 +152,7 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   if (p->kpagetbale) {
-    proc_freekpagetable(p->kpagetbale);
+    proc_freekpagetable(p->kpagetbale, p - proc);
   }
   p->kpagetbale = 0;
   p->sz = 0;
@@ -210,14 +211,13 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // Free a process's kernel page table, don't free
 // physical memory.
 void
-proc_freekpagetable(pagetable_t pagetable) {
+proc_freekpagetable(pagetable_t pagetable, int n) {
   uvmunmap(pagetable, UART0, 1, 0);
   uvmunmap(pagetable, VIRTIO0, 1, 0);
   uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
   uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
   uvmunmap(pagetable, TRAMPOLINE, (uint64)trampoline / PGSIZE, 0);
-  // Only kstack need to be physically freed.
-  uvmunmap(pagetable, KSTACK((int) 0), 1, 1);
+  uvmunmap(pagetable, KSTACK((int) n), 1, 0);
   uvmfree(pagetable, 0);
   return;
 }
