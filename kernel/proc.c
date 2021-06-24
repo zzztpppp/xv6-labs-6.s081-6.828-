@@ -124,7 +124,8 @@ found:
   if (pa == 0) {
     panic("kalloc");
   }
-  uint64 va = KSTACK((int) 0);
+  uint64 va = KSTACK((int) (p - proc));
+  kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
   mappages(p->kpagetbale, va, PGSIZE, (uint64)pa, PTE_R | PTE_W);
   p->kstack = va;
 
@@ -499,10 +500,14 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
         // Install per-process kerbel pagetable and enable paging
         kvminithart_p(p->kpagetbale);
 
         swtch(&c->context, &p->context);
+
+        // Swich to kernel_pagetable when process is done running.
+        kvminithart();
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
@@ -513,8 +518,8 @@ scheduler(void)
       release(&p->lock);
     }
 
-    if (found == 0)    // Use global kernel pagetable when no process' running
-      kvminithart();
+    // Use global kernel pagetable when no process' running
+    kvminithart();
 #if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
