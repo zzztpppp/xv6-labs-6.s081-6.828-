@@ -216,7 +216,8 @@ proc_freekpagetable(pagetable_t pagetable, int n) {
   uvmunmap(pagetable, VIRTIO0, 1, 0);
   uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
   uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
-  uvmunmap(pagetable, TRAMPOLINE, (uint64)trampoline / PGSIZE, 0);
+  uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
+  uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, KSTACK((int) n), 1, 0);
   uvmfree(pagetable, 0);
   return;
