@@ -270,6 +270,10 @@ growproc(int n)
   struct proc *p = myproc();
 
   sz = p->sz;
+  // Process size are not allowed to grow beyond UVASTOP
+  if (sz + n >= UVASTOP)
+    return -1;
+
   if(n > 0){
     if((sz = uvmalloc(p->pagetable, sz, sz + n, p->kpagetbale)) == 0) {
       return -1;

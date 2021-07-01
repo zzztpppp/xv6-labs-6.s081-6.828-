@@ -47,6 +47,7 @@
 #define KERNBASE 0x80000000L
 #define PHYSTOP (KERNBASE + 128*1024*1024)
 
+
 // map the trampoline page to the highest address,
 // in both user and kernel space.
 #define TRAMPOLINE (MAXVA - PGSIZE)
@@ -62,6 +63,8 @@
 //   fixed-size stack
 //   expandable heap
 //   ...
-//   TRAPFRAME (p->trapframe, used by the trampoline)
-//   TRAMPOLINE (the same page as in the kernel)
-#define TRAPFRAME (TRAMPOLINE - PGSIZE)
+//   TRAPFRAME (p->trapframe, used by the trampoline) at UVASTOP
+// The maximum virtual address a user can access
+// which equals PLIC
+#define UVASTOP  (PLIC)
+#define TRAPFRAME (UVASTOP - PGSIZE)
