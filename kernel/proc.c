@@ -246,9 +246,8 @@ userinit(void)
   
   // allocate one user page and copy init's instructions
   // and data into it.
-  uvminit(p->pagetable, initcode, sizeof(initcode));
+  uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetbale);
   p->sz = PGSIZE;
-  //TODO: Add user mapping to kernel pagetable
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
