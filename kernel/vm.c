@@ -269,9 +269,10 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
 }
 
 // Allocate PTEs and physical memory to grow process from oldsz to
-// newsz, which need not be page aligned.  Returns new size or 0 on error.
+// newsz, which need not be page aligned. Add the same mapping to user's kernel pagetable.
+// Returns new size or 0 on error.
 uint64
-uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, pagetable_t kpagetable)
 {
   char *mem;
   uint64 a;
@@ -290,6 +291,12 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
       kfree(mem);
       uvmdealloc(pagetable, a, oldsz);
+      return 0;
+    }
+    // User's kernel pagetable only need to read user mappings.
+    if (mappages(kpagetable, a, PGSIZE, (uint64)mem, PTE_R) != 0) {
+      kfree(mem);
+      uvmdealloc(kpagetable, a, oldsz);
       return 0;
     }
   }
