@@ -301,6 +301,12 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  // Copy user mappings from parent's kpagetable to child's
+  if (uvmcopy(p->kpagetbale, np->kpagetbale, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
   np->sz = p->sz;
 
   np->parent = p;
