@@ -286,22 +286,23 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, pagetable_t kpagetab
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
-      uvmdealloc(pagetable, a, oldsz);
+      uvmdealloc(pagetable, a, oldsz, (pagetable_t)0);
       return 0;
     }
     memset(mem, 0, PGSIZE);
     if(mappages(pagetable, a, PGSIZE, (uint64)mem, PTE_W|PTE_X|PTE_R|PTE_U) != 0){
       kfree(mem);
-      uvmdealloc(pagetable, a, oldsz);
+      uvmdealloc(pagetable, a, oldsz, (pagetable_t)0);
       return 0;
     }
     // User's kernel pagetable only need to read user mappings.
-    if (mappages(kpagetable, a, PGSIZE, (uint64)mem, PTE_R) != 0) {
+    if ( kpagetable && (mappages(kpagetable, a, PGSIZE, (uint64)mem, PTE_R) != 0)) {
       kfree(mem);
-      uvmdealloc(kpagetable, a, oldsz);
+      uvmdealloc(kpagetable, a, oldsz, kpagetable);
       return 0;
     }
   }
+
   return newsz;
 }
 
@@ -310,7 +311,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, pagetable_t kpagetab
 // need to be less than oldsz.  oldsz can be larger than the actual
 // process size.  Returns the new process size.
 uint64
-uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
+uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, pagetable_t kpagetable)
 {
   if(newsz >= oldsz)
     return oldsz;
@@ -318,6 +319,8 @@ uvmdealloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz)
   if(PGROUNDUP(newsz) < PGROUNDUP(oldsz)){
     int npages = (PGROUNDUP(oldsz) - PGROUNDUP(newsz)) / PGSIZE;
     uvmunmap(pagetable, PGROUNDUP(newsz), npages, 1);
+    if (kpagetable)
+      uvmunmap(kpagetable, PGROUNDUP(newsz), npages, 0);
   }
 
   return newsz;
