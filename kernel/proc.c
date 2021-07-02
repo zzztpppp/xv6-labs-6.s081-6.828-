@@ -147,7 +147,7 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   if (p->kpagetbale) {
-    proc_freekpagetable(p->kpagetbale, p - proc, p->sz);
+    proc_freekpagetable(p->kpagetbale, p, p->sz);
   }
   p->kpagetbale = 0;
   p->sz = 0;
@@ -243,14 +243,14 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // Free a process's kernel page table, don't free
 // physical memory.
 void
-proc_freekpagetable(pagetable_t pagetable, int n, uint64 sz) {
+proc_freekpagetable(pagetable_t pagetable, struct proc *p, uint64 sz) {
   uvmunmap(pagetable, UART0, 1, 0);
   uvmunmap(pagetable, VIRTIO0, 1, 0);
   uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
   uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
   uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
-  uvmunmap(pagetable, KSTACK((int) n), 1, 0);
+  uvmunmap(pagetable, KSTACK((int) (p - proc)), 1, 0);
   uvmfree(pagetable, sz);
   return;
 }
