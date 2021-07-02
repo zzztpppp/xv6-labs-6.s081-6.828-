@@ -203,28 +203,87 @@ pagetable_t proc_kpagetable(struct proc *p) {
   // at booting
 
   // uart registers
-  mappages(pagetable, UART0, PGSIZE, UART0, PTE_R | PTE_W);
+  if (mappages(pagetable, UART0, PGSIZE, 
+               UART0, PTE_R | PTE_W) < 0){
+    
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // virtio mmio disk interface
-  mappages(pagetable, VIRTIO0,  PGSIZE, VIRTIO0, PTE_R | PTE_W);
+  if (mappages(pagetable, VIRTIO0,  PGSIZE, VIRTIO0, PTE_R | PTE_W) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // PLIC
-  mappages(pagetable, PLIC, 0x400000, PLIC, PTE_R | PTE_W);
+  if (mappages(pagetable, PLIC, 0x400000, PLIC, PTE_R | PTE_W) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // map kernel text executable and read-only.
-  mappages(pagetable, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X);
+  if (mappages(pagetable, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // map kernel data and the physical RAM we'll make use of.
-  mappages(pagetable, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W);
+  if (mappages(pagetable, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W) < 0) {
+    
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+    uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
-  mappages(pagetable, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X);
+  if (mappages(pagetable, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+    uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
 
   // Set up kernel stack 
   uint64 va = KSTACK((int) (p - proc));
   uint64 pa = kvmpa(va);
-  mappages(pagetable, va, PGSIZE, (uint64)pa, PTE_R | PTE_W);
+  if (mappages(pagetable, va, PGSIZE, (uint64)pa, PTE_R | PTE_W) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+    uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmunmap(pagetable, KSTACK((int) (p - proc)), 1, 0);
+
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
   p->kstack = va;
 
   return pagetable;
@@ -276,7 +335,6 @@ userinit(void)
   p = allocproc();
   initproc = p;
   
-  vmprint((pagetable_t)PTE2PA(p->kpagetbale[0]));
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetbale);

@@ -39,7 +39,7 @@ exec(char *path, char **argv)
     goto bad;
   if((kpagetable = proc_kpagetable(p)) == 0)
     goto bad;
-
+  
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, 0, (uint64)&ph, off, sizeof(ph)) != sizeof(ph))
@@ -129,6 +129,8 @@ exec(char *path, char **argv)
  bad:
   if(pagetable)
     proc_freepagetable(pagetable, sz);
+  if(kpagetable)
+    proc_freepagetable(kpagetable, sz);
   if(ip){
     iunlockput(ip);
     end_op();
