@@ -118,17 +118,12 @@ found:
   }
 
   // A copy of the global kernel pagetable
-  p->kpagetbale = ukvminit();
+  p->kpagetbale = proc_kpagetable(p);
   if (p->kpagetbale == 0) {
     freeproc(p);
     release(&p->lock);
     return 0;
   }
-  // Set up kernel stack 
-  uint64 va = KSTACK((int) (p - proc));
-  uint64 pa = kvmpa(va);
-  mappages(p->kpagetbale, va, PGSIZE, (uint64)pa, PTE_R | PTE_W);
-  p->kstack = va;
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -152,7 +147,7 @@ freeproc(struct proc *p)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
   if (p->kpagetbale) {
-    proc_freekpagetable(p->kpagetbale, p - proc);
+    proc_freekpagetable(p->kpagetbale, p - proc, p->sz);
   }
   p->kpagetbale = 0;
   p->sz = 0;
@@ -198,6 +193,43 @@ proc_pagetable(struct proc *p)
   return pagetable;
 }
 
+// Return a new pagetable that maps to the same physical memory chunk
+// as the global kernel pagetable. Used to create and initialize 
+// per-process kernel page table
+pagetable_t proc_kpagetable(struct proc *p) {
+  pagetable_t pagetable = uvmcreate();
+
+  // Same as kvminit, except for CLINT which is only useful
+  // at booting
+
+  // uart registers
+  mappages(pagetable, UART0, PGSIZE, UART0, PTE_R | PTE_W);
+
+  // virtio mmio disk interface
+  mappages(pagetable, VIRTIO0,  PGSIZE, VIRTIO0, PTE_R | PTE_W);
+
+  // PLIC
+  mappages(pagetable, PLIC, 0x400000, PLIC, PTE_R | PTE_W);
+
+  // map kernel text executable and read-only.
+  mappages(pagetable, KERNBASE, (uint64)etext-KERNBASE, KERNBASE, PTE_R | PTE_X);
+
+  // map kernel data and the physical RAM we'll make use of.
+  mappages(pagetable, (uint64)etext, PHYSTOP-(uint64)etext, (uint64)etext, PTE_R | PTE_W);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  mappages(pagetable, TRAMPOLINE, PGSIZE, (uint64)trampoline, PTE_R | PTE_X);
+
+  // Set up kernel stack 
+  uint64 va = KSTACK((int) (p - proc));
+  uint64 pa = kvmpa(va);
+  mappages(pagetable, va, PGSIZE, (uint64)pa, PTE_R | PTE_W);
+  p->kstack = va;
+
+  return pagetable;
+}
+
 // Free a process's page table, and free the
 // physical memory it refers to.
 void
@@ -211,7 +243,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // Free a process's kernel page table, don't free
 // physical memory.
 void
-proc_freekpagetable(pagetable_t pagetable, int n) {
+proc_freekpagetable(pagetable_t pagetable, int n, uint64 sz) {
   uvmunmap(pagetable, UART0, 1, 0);
   uvmunmap(pagetable, VIRTIO0, 1, 0);
   uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
@@ -219,7 +251,7 @@ proc_freekpagetable(pagetable_t pagetable, int n) {
   uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, KSTACK((int) n), 1, 0);
-  uvmfree(pagetable, 0);
+  uvmfree(pagetable, sz);
   return;
 }
 
@@ -244,6 +276,7 @@ userinit(void)
   p = allocproc();
   initproc = p;
   
+  vmprint((pagetable_t)PTE2PA(p->kpagetbale[0]));
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetbale);
