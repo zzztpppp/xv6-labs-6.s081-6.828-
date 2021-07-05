@@ -497,3 +497,25 @@ vmprint(pagetable_t pagetable) {
   _vmprint(pagetable, 0);
   return;
 }
+
+
+// Check the given address range of two pagetables
+// if they have same mappings.
+int
+vmcompare(pagetable_t pt_1, pagetable_t pt_2, uint64 start, uint64 end) {
+  uint64 va, va_start = PGROUNDDOWN(start);
+  uint64 va_end = PGROUNDDOWN(end);
+  uint64 pa_1, pa_2;
+  int diff = 0;
+  for (va = va_start; va <= va_end; va += PGSIZE) {
+    pa_1 = walkaddr(pt_1, va);
+    pa_2 = walkaddr(pt_2, va);
+    if (pa_1 != pa_2) {
+      printf("Different mappings found!++++++++++++++++++++++++++++\n");
+      printf("Va %p in pagetable  %p map to %p\n", va, pt_1, pa_1);
+      printf("Va %p in pagetable  %p map to %p\n", va, pt_2, pa_2);
+      diff = 1;
+    }
+  }
+  return diff;
+}
