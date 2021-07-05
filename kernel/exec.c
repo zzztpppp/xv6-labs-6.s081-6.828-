@@ -113,8 +113,9 @@ exec(char *path, char **argv)
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
-  oldkpagetable = p->kpagetbale;
-  p->kpagetbale = kpagetable;
+  oldkpagetable = p->kpagetable;
+  p->kpagetable = kpagetable;
+  vmcompare(oldkpagetable, kpagetable, KERNBASE, MAXVA);
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer

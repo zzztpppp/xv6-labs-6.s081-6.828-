@@ -118,8 +118,8 @@ found:
   }
 
   // A copy of the global kernel pagetable
-  p->kpagetbale = proc_kpagetable(p);
-  if (p->kpagetbale == 0) {
+  p->kpagetable = proc_kpagetable(p);
+  if (p->kpagetable == 0) {
     freeproc(p);
     release(&p->lock);
     return 0;
@@ -146,10 +146,10 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   p->pagetable = 0;
-  if (p->kpagetbale) {
-    proc_freekpagetable(p->kpagetbale, p, p->sz);
+  if (p->kpagetable) {
+    proc_freekpagetable(p->kpagetable, p, p->sz);
   }
-  p->kpagetbale = 0;
+  p->kpagetable = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -337,7 +337,8 @@ userinit(void)
   
   // allocate one user page and copy init's instructions
   // and data into it.
-  uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetbale);
+  uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetable);
+  vmcompare(p->pagetable, p->kpagetable, 0, TRAPFRAME);
   p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
@@ -366,11 +367,11 @@ growproc(int n)
     return -1;
 
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n, p->kpagetbale)) == 0) {
+    if((sz = uvmalloc(p->pagetable, sz, sz + n, p->kpagetable)) == 0) {
       return -1;
     }
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n, p->kpagetbale);
+    sz = uvmdealloc(p->pagetable, sz, sz + n, p->kpagetable);
   }
   p->sz = sz;
   return 0;
@@ -396,8 +397,9 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  vmcompare(p->pagetable, p->kpagetable, 0, TRAPFRAME);
   // Copy user mappings from parent's kpagetable to child's
-  if (uvmcopy(p->kpagetbale, np->kpagetbale, p->sz) < 0){
+  if (uvmcopy(p->kpagetable, np->kpagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
@@ -604,7 +606,7 @@ scheduler(void)
         c->proc = p;
 
         // Install per-process kerbel pagetable and enable paging
-        kvminithart_p(p->kpagetbale);
+        kvminithart_p(p->kpagetable);
 
         swtch(&c->context, &p->context);
 
