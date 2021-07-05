@@ -499,6 +499,26 @@ vmprint(pagetable_t pagetable) {
 }
 
 
+// Used by vmcompare to walkaddr for kernel pagetable(PTE_U = 0)
+static uint64 
+_walkaddr_k(pagetable_t pagetable, uint64 va)
+{
+  pte_t *pte;
+  uint64 pa;
+
+  if(va >= MAXVA)
+    return 0;
+
+  pte = walk(pagetable, va, 0);
+  if(pte == 0)
+    return 0;
+  if((*pte & PTE_V) == 0)
+    return 0;
+  pa = PTE2PA(*pte);
+  return pa;
+}
+
+
 // Check the given address range of two pagetables
 // if they have same mappings.
 int
@@ -508,8 +528,8 @@ vmcompare(pagetable_t pt_1, pagetable_t pt_2, uint64 start, uint64 end) {
   uint64 pa_1, pa_2;
   int diff = 0;
   for (va = va_start; va <= va_end; va += PGSIZE) {
-    pa_1 = walkaddr(pt_1, va);
-    pa_2 = walkaddr(pt_2, va);
+    pa_1 = _walkaddr_k(pt_1, va);
+    pa_2 = _walkaddr_k(pt_2, va);
     if (pa_1 != pa_2) {
       printf("Different mappings found!++++++++++++++++++++++++++++\n");
       printf("Va %p in pagetable  %p map to %p\n", va, pt_1, pa_1);
