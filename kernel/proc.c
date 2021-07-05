@@ -267,6 +267,20 @@ pagetable_t proc_kpagetable(struct proc *p) {
     return 0;
   }
 
+  if (mappages(pagetable, TRAPFRAME, PGSIZE, (uint64)(p->trapframe), PTE_R) < 0) {
+
+    uvmunmap(pagetable, UART0, 1, 0);
+    uvmunmap(pagetable, VIRTIO0, 1, 0);
+    uvmunmap(pagetable, PLIC, 0x400000 / PGSIZE, 0);
+    uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
+    uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
+
   // Set up kernel stack 
   uint64 va = KSTACK((int) (p - proc));
   uint64 pa = kvmpa(va);
