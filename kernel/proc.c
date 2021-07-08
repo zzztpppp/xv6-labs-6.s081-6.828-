@@ -323,8 +323,13 @@ proc_freekpagetable(pagetable_t pagetable, struct proc *p, uint64 sz) {
   uvmunmap(pagetable, KERNBASE, ((uint64)etext-KERNBASE) / PGSIZE, 0);
   uvmunmap(pagetable, (uint64)etext, (PHYSTOP-(uint64)etext) / PGSIZE, 0);
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+  uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmunmap(pagetable, KSTACK((int) (p - proc)), 1, 0);
-  uvmfree(pagetable, sz);
+
+  // Free mappings with freeing uderlying memory
+  if(sz > 0)
+      uvmunmap(pagetable, 0, PGROUNDUP(sz)/PGSIZE, 0);
+  uvmfree(pagetable, 0);
   return;
 }
 
@@ -352,7 +357,6 @@ userinit(void)
   // allocate one user page and copy init's instructions
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode), p->kpagetable);
-  vmcompare(p->pagetable, p->kpagetable, 0, TRAPFRAME);
   p->sz = PGSIZE;
 
   // prepare for the very first "return" from kernel to user.
