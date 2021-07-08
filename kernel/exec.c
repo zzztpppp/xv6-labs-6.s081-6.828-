@@ -115,7 +115,8 @@ exec(char *path, char **argv)
   p->pagetable = pagetable;
   oldkpagetable = p->kpagetable;
   p->kpagetable = kpagetable;
-  vmcompare(oldkpagetable, kpagetable, KERNBASE, MAXVA);
+  kvminithart_p(kpagetable);    // Activate the new kpage table
+
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
