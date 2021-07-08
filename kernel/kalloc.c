@@ -80,3 +80,43 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+// Detect cycles in kmem
+int check_cycle() {
+    struct run *r, *rover;
+    r = kmem.freelist;
+    rover = r;
+    while (r) {
+        for (int i = 0; i < 2; i++) {
+            printf("Testing cycle at %p\n", rover);
+           rover = rover->next;
+           if (rover == 0) return 0;
+           if (rover == r) {
+               return 1;
+           }
+       }
+       r = r->next;
+    }
+    return 0;
+
+}
+
+void kcheck(){
+
+  struct run *r;
+  acquire(&kmem.lock);
+
+  r = kmem.freelist;
+  printf("Check cycle!");
+  if (check_cycle())
+      panic("Cycle in kmem!\n");
+  printf("Check valid!\n");
+  while (r) {
+      printf("%p\n", r);
+      if (((uint64)r % PGSIZE) != 0 || (char*)r < end || (uint64)r >= PHYSTOP)
+          panic("Corrupt klist!");
+    r = r->next;
+  }
+  release(&kmem.lock);
+  return;
+}
+
