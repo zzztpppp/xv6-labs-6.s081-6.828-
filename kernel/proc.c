@@ -399,7 +399,6 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -411,9 +410,10 @@ fork(void)
     release(&np->lock);
     return -1;
   }
-  vmcompare(p->pagetable, p->kpagetable, 0, TRAPFRAME);
+
+
   // Copy user mappings from parent's kpagetable to child's
-  if (uvmcopy(p->kpagetable, np->kpagetable, p->sz) < 0){
+  if (uvmcopy_mapping(p->kpagetable, np->kpagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
