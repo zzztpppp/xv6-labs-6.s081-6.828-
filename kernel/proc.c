@@ -415,9 +415,8 @@ fork(void)
     return -1;
   }
 
-
   // Copy user mappings from parent's kpagetable to child's
-  if (uvmcopy_mapping(p->kpagetable, np->kpagetable, p->sz) < 0){
+  if (uvmcopy_mapping(np->pagetable, np->kpagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
