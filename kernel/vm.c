@@ -497,6 +497,11 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
+
+/***********************************************************************
+ *  Helper functions to help vm debug
+***********************************************************************/
+
 // Recursion helper used by vmpprint
 static void _vmprint(pagetable_t pagetable, int level) {
   pte_t pte;
@@ -567,4 +572,18 @@ vmcompare(pagetable_t pt_1, pagetable_t pt_2, uint64 start, uint64 end) {
     }
   }
   return diff;
+}
+
+// Count the size(number of byes) mapped in the given pagetable
+// with specified va range
+uint64
+vmsz(pagetable_t pagetable, uint64 start, uint64 end) {
+  uint64 va, va_start = PGROUNDDOWN(start), va_end = PGROUNDDOWN(end), sz = 0;
+  uint64 pa;
+  for (va = va_start; va <= va_end; va += PGSIZE) {
+    if(_walkaddr_k(pagetable, va))
+      sz += PGSIZE;
+  }
+
+  return sz;
 }
