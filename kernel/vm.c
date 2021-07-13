@@ -146,7 +146,7 @@ kvmpa(uint64 va)
   uint64 off = va % PGSIZE;
   pte_t *pte;
   uint64 pa;
-  
+
   pte = walk(kernel_pagetable, va, 0);
   if(pte == 0)
     panic("kvmpa");
@@ -397,11 +397,31 @@ void
 uvmclear(pagetable_t pagetable, uint64 va)
 {
   pte_t *pte;
-  
+
   pte = walk(pagetable, va, 0);
   if(pte == 0)
     panic("uvmclear");
   *pte &= ~PTE_U;
+}
+
+// Clear all mappings of a given kpagetable.
+// This function can only be used with per-process kernel pagetable
+// since it doesn't free the underlying physical memory.
+void
+unmapwalk(pagetable_t pagetable) {
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      unmapwalk((pagetable_t)child);
+      pagetable[i] = 0;
+    } else if(pte & PTE_V){
+      pagetable[i] = 0;
+    }
+  }
+  kfree((void*)pagetable);
 }
 
 // Copy from kernel to user.
