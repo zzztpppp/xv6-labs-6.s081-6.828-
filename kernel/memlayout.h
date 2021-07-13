@@ -67,4 +67,4 @@
 // The maximum virtual address a user can access
 // which equals PLIC
 #define UVASTOP  (PLIC)
-#define TRAPFRAME (UVASTOP - PGSIZE)
+#define TRAPFRAME (TRAMPOLINE - PGSIZE)
