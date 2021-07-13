@@ -198,6 +198,8 @@ proc_pagetable(struct proc *p)
 // per-process kernel page table
 pagetable_t proc_kpagetable(struct proc *p) {
   pagetable_t pagetable = uvmcreate();
+  if (pagetable == 0)
+    return 0;
 
   // Same as kvminit, except for CLINT which is only useful
   // at booting
