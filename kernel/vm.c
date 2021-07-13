@@ -579,7 +579,6 @@ vmcompare(pagetable_t pt_1, pagetable_t pt_2, uint64 start, uint64 end) {
 uint64
 vmsz(pagetable_t pagetable, uint64 start, uint64 end) {
   uint64 va, va_start = PGROUNDDOWN(start), va_end = PGROUNDDOWN(end), sz = 0;
-  uint64 pa;
   for (va = va_start; va <= va_end; va += PGSIZE) {
     if(_walkaddr_k(pagetable, va))
       sz += PGSIZE;
