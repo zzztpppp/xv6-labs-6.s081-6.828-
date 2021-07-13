@@ -363,7 +363,6 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
-
   sz = p->sz;
   // Process size are not allowed to grow beyond UVASTOP
   if (sz + n >= UVASTOP)
@@ -401,7 +400,7 @@ fork(void)
   }
 
   // Copy user mappings from parent's kpagetable to child's
-  if (uvmcopy_mapping(np->pagetable, np->kpagetable, p->sz) < 0){
+  if (uvmcopy_mapping(p->kpagetable, np->kpagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
