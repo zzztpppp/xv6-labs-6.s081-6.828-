@@ -1,7 +1,7 @@
 # xv6-labs-6.s081-6.828-
 - [x] Lab Util
 - [x] Lab System calls
-- [ ] Lab Page tables
+- [x] Lab Page tables
 - [ ] Lab Traps
 - [ ] Lab Lazy allocation
 - [ ] Lab Copy on-write
