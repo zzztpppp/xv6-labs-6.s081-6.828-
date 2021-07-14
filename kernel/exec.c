@@ -132,7 +132,7 @@ exec(char *path, char **argv)
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(kpagetable)
-    proc_freepagetable(kpagetable, sz);
+    proc_freekpagetable(kpagetable, p, sz);
   if(ip){
     iunlockput(ip);
     end_op();
