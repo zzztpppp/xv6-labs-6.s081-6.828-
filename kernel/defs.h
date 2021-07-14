@@ -189,6 +189,10 @@ void            vmprint(pagetable_t);
 int             vmcompare(pagetable_t pt_1, pagetable_t pt_2, uint64 start, uint64 end);
 uint64          vmsz(pagetable_t, uint64, uint64);
 
+// vmcopyin.c
+int             copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len);
+int             copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max);
+
 // plic.c
 void            plicinit(void);
 void            plicinithart(void);
