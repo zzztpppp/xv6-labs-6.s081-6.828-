@@ -365,13 +365,12 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 
 
 // Copy mappings instead of underlying memories, of 
-// two given pagetable
+// two given pagetable. Need to specify flags after copy.
 int
-uvmcopy_mapping(pagetable_t old, pagetable_t new, uint64 sz) {
+uvmcopy_mapping(pagetable_t old, pagetable_t new, uint64 sz, uint flags) {
 
   pte_t *pte;
   uint64 pa, i;
-  uint flags;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -379,7 +378,6 @@ uvmcopy_mapping(pagetable_t old, pagetable_t new, uint64 sz) {
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte);
     if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       goto err;
     }
