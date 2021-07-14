@@ -1,0 +1,4 @@
+1. Page 0 contains codes. Read, yes, write, no.
+2. Since srcva and len both are unsigned values, adding them up could result in overflow.
+supose p->sz = 4096, srva = 4095, len = 0xffffffff. Then, len + srva results in 4094 which is an overflow, but still
+fails the first two test.
