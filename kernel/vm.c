@@ -256,7 +256,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, pagetable_t kpagetab
   for(a = oldsz; a < newsz; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
-      uvmdealloc(pagetable, a, oldsz, (pagetable_t)0);
+      uvmdealloc(pagetable, a, oldsz, (pagetable_t)kpagetable);
       return 0;
     }
     memset(mem, 0, PGSIZE);
