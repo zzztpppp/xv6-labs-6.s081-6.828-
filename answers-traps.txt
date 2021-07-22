@@ -1,0 +1,14 @@
+1. For the function printf, its the first argument is format string stored in a0, second the 12 stored in a1
+   third is 13 stored in a2.
+2. The call to  `f` is optimized out with the result put at where the function is called. `g` in inlined directly into
+   `f`
+3. 0x30 + 1528 = 0x628
+4. jalr set R[x1] to PC + 4 = 0x38
+5. I believe `little endian` here only to describe the byte order i.e. for an 4-byte integer,
+   index 0 points to the least significant 8 bits. If the byte order is big-endian, then index 0 points to
+   the most significant 8 bits. To produce the same output, `i` has to be `0x726c6400`. The number 5716 don't
+   need to be changed, since on whatever-endian, decimal number 5716 gets translated to the hex form 0xe110 with
+   no doubt.
+6. The printing content passed to the format string in `printf` is an c array. `printf` gets next argument once a % is
+   encountered in `fmt` without bound check. So when insufficient arguments is passed, arguments retrieved beyond the
+   valid ones are undefined values which can be any numbers or cause an error.
