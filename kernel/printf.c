@@ -117,6 +117,7 @@ printf(char *fmt, ...)
 void
 panic(char *s)
 {
+  backtrace();
   pr.locking = 0;
   printf("panic: ");
   printf(s);
@@ -132,3 +133,23 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+/*************************************************************
+ * Lab trap - backtrace
+ **************************************************************/
+ void backtrace(void) {
+
+     // Read the frame pointer of current stack
+     uint64 fp =  r_fp(), ra;
+
+     uint64 stack_top = PGROUNDDOWN((uint64) fp);
+     uint64 stack_bottom = PGROUNDUP((uint64) fp);
+
+     do {
+         ra = *((uint64 *) fp - 1);
+         // We should print the previous instruction of ra; instructions are 32-bit wide.
+         printf("%p\n", (uint32 *) ra - 1);
+
+         fp = *((uint64 *) fp - 2);
+     } while (fp >= stack_top && fp < stack_bottom);
+ }
