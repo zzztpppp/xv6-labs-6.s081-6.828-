@@ -103,4 +103,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  // Timer interupt handler and interval.
+  void (*timer_handler)();
+  int ticks_to_call;  // When should we call the handler
+  int ticks_elapsed;     // Ticks elapsed from last call.
+
 };

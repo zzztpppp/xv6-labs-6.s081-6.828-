@@ -107,6 +107,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
 
+  // Initialize timer interupt ticks
+  p->ticks_elapsed = 0;
+  p->ticks_to_call = 0;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     release(&p->lock);

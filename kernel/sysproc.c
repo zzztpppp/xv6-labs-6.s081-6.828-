@@ -95,3 +95,25 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// Install timer interupt handler
+//
+uint64
+sys_sigalarm(void) {
+    int n_ticks;
+    uint64 handler;
+    if (argint(0, &n_ticks) < 0)
+        return -1;
+    if (argaddr(1, &handler) < 0)
+        return -1;
+
+    struct proc *p = myproc();
+    p->ticks_to_call = n_ticks;
+    p->timer_handler = (void (*)()) handler;
+    return 0;
+}
+
+uint64
+sys_sigreturn(void) {
+    return 0;
+}

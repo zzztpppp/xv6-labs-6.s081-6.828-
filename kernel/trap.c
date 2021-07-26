@@ -76,9 +76,14 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
-  // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  // Call the corresponding handler give up the CPU if this is a timer interrupt.
+  if(which_dev == 2) {
+      if (p->ticks_to_call != 0 && p->ticks_elapsed == p->ticks_to_call)
+          p->trapframe->ra = (uint64) p->timer_handler;    // Execute handler when return to user space.
+      else if (p->ticks_to_call != 0)
+          p->ticks_elapsed += 1;
+      yield();
+  }
 
   usertrapret();
 }
