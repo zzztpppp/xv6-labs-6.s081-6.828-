@@ -105,8 +105,10 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   // Timer interupt handler and interval.
-  void (*timer_handler)();
+  uint64 timer_handler;
   int ticks_to_call;  // When should we call the handler
   int ticks_elapsed;     // Ticks elapsed from last call.
-
+  int handler_returned;   // Whether a handler call is returned.
+  struct trapframe *sigretrun_trapframe;    // Used by sigreturn to return to user space where
+                                            // interrupt occurs rather than to where sigreturn is called.
 };

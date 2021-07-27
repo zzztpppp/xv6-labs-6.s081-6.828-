@@ -108,11 +108,18 @@ found:
   p->pid = allocpid();
 
   // Initialize timer interupt ticks
-  p->ticks_elapsed = 0;
+  p->ticks_elapsed = 1;
   p->ticks_to_call = 0;
+  p->handler_returned = 1;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+
+  // Allocate a trapframe page for interrupt handler.
+  if((p->sigretrun_trapframe = (struct trapframe *)kalloc()) == 0){
     release(&p->lock);
     return 0;
   }
@@ -142,6 +149,8 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
+  if(p->sigretrun_trapframe)
+    kfree((void*)p->sigretrun_trapframe);
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
@@ -154,6 +163,11 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  p->ticks_elapsed = 0;
+  p->ticks_to_call = 0;
+  p->handler_returned = 0;
+  p->timer_handler = 0;
 }
 
 // Create a user page table for a given process,
