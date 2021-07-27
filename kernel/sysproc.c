@@ -106,14 +106,20 @@ sys_sigalarm(void) {
         return -1;
     if (argaddr(1, &handler) < 0)
         return -1;
-
     struct proc *p = myproc();
     p->ticks_to_call = n_ticks;
-    p->timer_handler = (void (*)()) handler;
+    p->timer_handler = handler;
     return 0;
 }
 
+// Resume control to user instruction where timer interupt
+// has been invoked after calling hander.
 uint64
 sys_sigreturn(void) {
+
+    struct proc *p = myproc();
+    memmove(p->trapframe, p->sigretrun_trapframe, sizeof(struct trapframe));
+    p->handler_returned = 1;
+    usertrapret();
     return 0;
 }
