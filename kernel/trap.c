@@ -78,8 +78,14 @@ usertrap(void)
 
   // Call the corresponding handler give up the CPU if this is a timer interrupt.
   if(which_dev == 2) {
-      if (p->ticks_to_call != 0 && p->ticks_elapsed == p->ticks_to_call)
-          p->trapframe->ra = (uint64) p->timer_handler;    // Execute handler when return to user space.
+      if ((p->ticks_to_call != 0) && (p->ticks_elapsed == p->ticks_to_call) && (p->handler_returned)) {
+          memmove(p->sigretrun_trapframe, p->trapframe, sizeof(struct trapframe));
+          p->handler_returned = 0;
+          p->trapframe->epc = p->timer_handler;    // Execute handler when return to user space.
+          p->ticks_elapsed = 1;
+      }
+      else if (p->ticks_to_call != 0 && p->ticks_elapsed == p->ticks_to_call)
+          p->ticks_elapsed = 1;
       else if (p->ticks_to_call != 0)
           p->ticks_elapsed += 1;
       yield();
