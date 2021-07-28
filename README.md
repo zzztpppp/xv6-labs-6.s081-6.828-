@@ -2,7 +2,7 @@
 - [x] Lab Util
 - [x] Lab System calls
 - [x] Lab Page tables
-- [ ] Lab Traps
+- [x] Lab Traps
 - [ ] Lab Lazy allocation
 - [ ] Lab Copy on-write
 - [ ] Lab Multithreading
