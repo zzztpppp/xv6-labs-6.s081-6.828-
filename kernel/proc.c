@@ -235,12 +235,18 @@ userinit(void)
 
 // Grow or shrink user memory by n bytes.
 // Return 0 on success, -1 on failure.
+// Lazy allocation when n > 0
 int
 growproc(int n)
 {
+  uint sz;
   struct proc *p = myproc();
-  p->sz = p->sz + n;
-
+  if (n < 0){
+    sz = uvmdealloc(p->pagetable, sz, sz + n);
+  }
+  else
+      sz = sz + n;
+  p->sz = sz;
   return 0;
 }
 
