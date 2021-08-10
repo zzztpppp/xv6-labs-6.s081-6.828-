@@ -73,8 +73,9 @@ usertrap(void)
           printf("Out of memory!\n");
           p->killed = 1;
       }
-      else if (mappages(p->pagetable, va, (uint64)mem, PGSIZE, PTE_R | PTE_W | PTE_U) == 0) {
+      else if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_R | PTE_W | PTE_U) < 0) {
           printf("Map failed!\n");
+          kfree(mem);
           p->killed = 1;
       }
       else {
