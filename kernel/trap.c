@@ -69,7 +69,11 @@ usertrap(void)
   else if((r_scause() == 13) || (r_scause() == 15)) {    // Page fault handling. Lazy allocation.
       char *mem;
       uint64 va = PGROUNDDOWN(r_stval());
-      if ((mem = kalloc()) == 0) {
+      if (r_stval() > p->sz) {
+          printf("Overflow error!\n");
+          p->killed = 1;
+      }
+      else if ((mem = kalloc()) == 0) {
           printf("Out of memory!\n");
           p->killed = 1;
       }
