@@ -66,7 +66,8 @@ usertrap(void)
 
     syscall();
   }
-  else if((r_scause() == 13) || (r_scause() == 15)) {    // Page fault handling. Lazy allocation.
+  else if(((r_scause() == 13) || (r_scause() == 15)) && (r_stval() > p->trapframe->sp)) {
+      // Page fault handling. Lazy allocation. Not including guard pagefalut
       char *mem;
       uint64 va = PGROUNDDOWN(r_stval());
       if (r_stval() > p->sz) {

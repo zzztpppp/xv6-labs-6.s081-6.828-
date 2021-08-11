@@ -241,11 +241,13 @@ growproc(int n)
 {
   uint sz;
   struct proc *p = myproc();
+  sz = p->sz;
   if (n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
   else
       sz = sz + n;
+  if ((uint64)sz > MAXVA) return -1;
   p->sz = sz;
   return 0;
 }
