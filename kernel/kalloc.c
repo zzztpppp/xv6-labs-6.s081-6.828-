@@ -14,6 +14,10 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
+uint8 reference_count[NPPAGES]; // Reference count to a given physical page.
+struct spinlock reference_lock;
+
+
 struct run {
   struct run *next;
 };
@@ -27,6 +31,11 @@ void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  initlock(&reference_lock, "refcnt");
+  // Initialize reference counts to 0
+  for (int i = 0; i < NPPAGES; i++) {
+      reference_count[i] = 0;
+  }
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -51,7 +60,13 @@ kfree(void *pa)
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
+  // Decrement reference count when kfree a page with multiple references.
+  uint8 count = decrement_reference((uint64)pa);
+  if (count > 0) {
+    return;
+  }
+
+    // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
   r = (struct run*)pa;
@@ -76,7 +91,29 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
+  if(r) {
+      increment_reference((uint64)r);
+      memset((char *) r, 5, PGSIZE); // fill with junk
+  }
   return (void*)r;
+}
+
+// Increment reference count of the physical page of a
+// given pa.
+int
+increment_reference(uint64 pa) {
+    uint8 cnt;
+    acquire(&reference_lock);
+    cnt = ++reference_count[PPAGE(pa)];
+    release(&reference_lock);
+    return cnt;
+}
+
+int
+decrement_reference(uint64 pa) {
+    uint8 cnt;
+    acquire(&reference_lock);
+    cnt = --reference_count[PPAGE(pa)];
+    release(&reference_lock);
+    return cnt;
 }

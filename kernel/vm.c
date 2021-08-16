@@ -335,6 +335,32 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return -1;
 }
 
+// Copy-on-write copy of user page tables.
+// Copy mappings form old to new, and clear PTE_W
+// in both pagetables.
+int
+uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
+
+    // Copy ptes from old to new.
+    int i;
+    for (i = 0; i < 512; i++) {
+        new[i] = old[i];
+    }
+
+    pte_t *pte;
+    // Remove PTE_W entry and mark the page as a copy-on-write page.
+    for (i = 0; i < sz; i += PGSIZE) {
+       if ((pte = walk(old, i, 0)) == 0)
+           panic("uvmcow: pte should exist");
+       if (*pte & PTE_V)
+           panic("uvmcow: page not present");
+
+       *pte = *pte & (~PTE_W) & PTE_COW;
+       increment_reference(PTE2PA(*pte));
+    }
+    return 0;
+}
+
 // mark a PTE invalid for user access.
 // used by exec for the user stack guard page.
 void
