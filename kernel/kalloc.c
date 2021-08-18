@@ -28,26 +28,22 @@ struct {
 } kmem;
 
 
-void
+uint64
 refcnt_init() {
     uint64 pa_start, npages;
-    pa_start = PGROUNDUP((uint64) pa_start);
-    npages = ((uint64) end - pa_start) / PGSIZE;
+    pa_start = PGROUNDUP((uint64) end);
+    npages = ((uint64) PHYSTOP - pa_start) / PGSIZE;
 
     // We use a byte to count references of a pa, since the max number of processes is 64, number of
-    // reference will not overflow.
-    uint8 *r= 0;
+    // reference will not overflow. This actually takes more space than it needed, but its fine.
     uint64 size = 8 * npages;
+    printf("size is %d\n", size);
+    reference_count = (uint8 *)end;
 
-    // Freelist is contiguous after initialization.
-    for (uint64 i = 0; i < PGROUNDUP(size); i+= PGSIZE) {
-        if((uint64)r)
-            kalloc();
-        else
-            r = (uint8 *) kalloc();
-        memset((void *)r, 0, PGSIZE);
-    }
-    reference_count = r;
+    // Initialize reference count to 1 so that freerange can run and decrement reference count.
+    memset(reference_count, 1, size);
+
+    return size;
 }
 
 void
@@ -55,9 +51,11 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   initlock(&reference_lock, "refcnt");
-  freerange(end, (void*)PHYSTOP);
-  // Initialize reference counts to 0
-  refcnt_init();
+  // Initialize reference count array
+  uint64 size = refcnt_init();
+
+  // Free memory now begins after reference_count
+  freerange(end + size / sizeof(char), (void*)PHYSTOP);
 }
 
 void
@@ -119,13 +117,20 @@ kalloc(void)
   return (void*)r;
 }
 
+
+// Returns the position that page of a pa at in reference_count
+int
+page_at(uint64 pa) {
+   return PGROUNDDOWN(pa - (uint64) end) / PGSIZE;
+}
+
 // Increment reference count of the physical page of a
 // given pa.
 int
 increment_reference(uint64 pa) {
     uint8 cnt;
     acquire(&reference_lock);
-    cnt = ++reference_count[PPAGE(pa)];
+    cnt = ++reference_count[page_at(pa)];
     release(&reference_lock);
     return cnt;
 }
@@ -134,7 +139,7 @@ int
 decrement_reference(uint64 pa) {
     uint8 cnt;
     acquire(&reference_lock);
-    cnt = --reference_count[PPAGE(pa)];
+    cnt = --reference_count[page_at(pa)];
     release(&reference_lock);
     return cnt;
 }
