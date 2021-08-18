@@ -68,8 +68,28 @@ usertrap(void)
   } else if (((r_scause() == 13) || (r_scause() == 15)) && (is_cowpage(p->pagetable, r_stval()))) {
       uint64 va = r_stval();
       char *mem = kalloc();
-      uvmunmap(p->pagetable, va, 1, 1);
-      mappages(p->pagetable, va, PGSIZE, (uint64) mem, uvmperm(p->pagetable, va));
+      if (mem == 0) {
+        p->killed = 1;
+      }
+      else {
+          // Copy memory
+          printf("cow hit!\n");
+          uint64  parent_mem = walkaddr(p->pagetable, va);
+          memmove(mem, (void *) parent_mem, PGSIZE);
+
+          // Set PTE_W in parent's page. And the page is not a COW page after the copy.
+          int perm = uvmperm(p->pagetable, va);
+          uvmset_perm(p->pagetable, va, (perm | PTE_W) & (~PTE_COW));
+
+          // Unmap from child pagetable and decrement reference count to the underlying physical page.
+          uvmunmap(p->pagetable, va, 1, 1);
+
+          // Remove pte at the level 2 of the child's pagetable so that mappages can allocate a new pagetable
+          p->pagetable[PX(2, va)] = 0;
+
+          mappages(p->pagetable, va, PGSIZE, (uint64) mem, perm | PTE_W);
+      }
+
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {

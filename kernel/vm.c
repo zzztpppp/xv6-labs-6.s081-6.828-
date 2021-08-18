@@ -364,7 +364,7 @@ uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
     for (i = 0; i < sz; i += PGSIZE) {
        if ((pte = walk(old, i, 0)) == 0)
            panic("uvmcow: pte should exist");
-       if (*pte & PTE_V)
+       if ((*pte & PTE_V) == 0)
            panic("uvmcow: page not present");
 
        *pte = *pte & (~PTE_W) & PTE_COW;
@@ -381,10 +381,23 @@ uvmperm(pagetable_t pagetable, uint64 va) {
     pte = walk(pagetable, va, 0);
     if (pte == 0)
         panic("uvmperm: pte should exist");
-    if (*pte & PTE_V)
+    if ((*pte & PTE_V) == 0)
         panic("uvmperm, page not present");
 
     return PTE_FLAGS(*pte) & PTE_W & PTE_R & PTE_X & PTE_U;
+}
+
+// Add a given permission to a page corresponding to the given va.
+int
+uvmset_perm(pagetable_t pagetable, uint64 va, int perm) {
+    pte_t *pte;
+    pte = walk(pagetable, va, 0);
+    if (pte == 0)
+        panic("uvmperm: pte should exist");
+    if ((*pte & PTE_V) == 0)
+        panic("uvmperm, page not present");
+    *pte = *pte | perm;
+    return 0;
 }
 
 // mark a PTE invalid for user access.
