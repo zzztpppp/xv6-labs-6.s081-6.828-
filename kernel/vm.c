@@ -167,6 +167,18 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
   return 0;
 }
 
+// Determine is a given va in a cow page
+int
+is_cowpage(pagetable_t pagetable, uint64 va) {
+   pte_t *pte;
+   if((pte = walk(pagetable, va, 0)) == 0)
+        panic("uvmunmap: walk");
+   if((*pte & PTE_V) == 0)
+        panic("uvmunmap: not mapped");
+
+   return *pte & PTE_COW;
+}
+
 // Remove npages of mappings starting from va. va must be
 // page-aligned. The mappings must exist.
 // Optionally free the physical memory.
@@ -359,6 +371,20 @@ uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
        increment_reference(PTE2PA(*pte));
     }
     return 0;
+}
+
+
+// Return permission associated with the page of a given pa.
+int
+uvmperm(pagetable_t pagetable, uint64 va) {
+    pte_t *pte;
+    pte = walk(pagetable, va, 0);
+    if (pte == 0)
+        panic("uvmperm: pte should exist");
+    if (*pte & PTE_V)
+        panic("uvmperm, page not present");
+
+    return PTE_FLAGS(*pte) & PTE_W & PTE_R & PTE_X & PTE_U;
 }
 
 // mark a PTE invalid for user access.
