@@ -65,6 +65,11 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if (((r_scause() == 13) || (r_scause() == 15)) && (is_cowpage(p->pagetable, r_stval()))) {
+      uint64 va = r_stval();
+      char *mem = kalloc();
+      uvmunmap(p->pagetable, va, 1, 1);
+      mappages(p->pagetable, va, PGSIZE, (uint64) mem, uvmperm(p->pagetable, va));
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
