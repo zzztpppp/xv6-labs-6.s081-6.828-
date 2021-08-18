@@ -14,7 +14,7 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-uint8 reference_count[NPPAGES]; // Reference count to a given physical page.
+uint8 *reference_count;
 struct spinlock reference_lock;
 
 
@@ -27,16 +27,37 @@ struct {
   struct run *freelist;
 } kmem;
 
+
+void
+refcnt_init() {
+    uint64 pa_start, npages;
+    pa_start = PGROUNDUP((uint64) pa_start);
+    npages = ((uint64) end - pa_start) / PGSIZE;
+
+    // We use a byte to count references of a pa, since the max number of processes is 64, number of
+    // reference will not overflow.
+    uint8 *r= 0;
+    uint64 size = 8 * npages;
+
+    // Freelist is contiguous after initialization.
+    for (uint64 i = 0; i < PGROUNDUP(size); i+= PGSIZE) {
+        if((uint64)r)
+            kalloc();
+        else
+            r = (uint8 *) kalloc();
+        memset((void *)r, 0, PGSIZE);
+    }
+    reference_count = r;
+}
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
   initlock(&reference_lock, "refcnt");
-  // Initialize reference counts to 0
-  for (int i = 0; i < NPPAGES; i++) {
-      reference_count[i] = 0;
-  }
   freerange(end, (void*)PHYSTOP);
+  // Initialize reference counts to 0
+  refcnt_init();
 }
 
 void
