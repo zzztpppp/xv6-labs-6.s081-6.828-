@@ -171,6 +171,8 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
 int
 is_cowpage(pagetable_t pagetable, uint64 va) {
    pte_t *pte;
+   if (va >= MAXVA)
+       return 0;
    if((pte = walk(pagetable, va, 0)) == 0)
        return 0;
    if((*pte & PTE_V) == 0)
