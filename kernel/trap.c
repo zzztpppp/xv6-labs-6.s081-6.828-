@@ -73,21 +73,27 @@ usertrap(void)
       }
       else {
           // Copy memory
-          printf("cow hit!\n");
+//          printf("cow hit!\n");
           uint64  parent_mem = walkaddr(p->pagetable, va);
+          if (parent_mem == 0) {
+              printf("COW page not mapped!\n");
+              p->killed = 1;
+          }
           memmove(mem, (void *) parent_mem, PGSIZE);
 
-          // Set PTE_W in parent's page. And the page is not a COW page after the copy.
+          // Extract permissions of cow page.
           int perm = uvmperm(p->pagetable, va);
-          uvmset_perm(p->pagetable, va, (perm | PTE_W) & (~PTE_COW));
+//          printf("%d\n", perm);
 
-          // Unmap from child pagetable and decrement reference count to the underlying physical page.
-          uvmunmap(p->pagetable, va, 1, 1);
+          // Decrease reference count of underlying pa. Unmap the cow page from user pagetable
+          uvmunmap(p->pagetable, PGROUNDDOWN(va), 1, 1);
 
-          // Remove pte at the level 2 of the child's pagetable so that mappages can allocate a new pagetable
-          p->pagetable[PX(2, va)] = 0;
-
-          mappages(p->pagetable, va, PGSIZE, (uint64) mem, perm | PTE_W);
+          // Map the copied page to user pagetable.
+          if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64) mem, perm | PTE_W ) != 0) {
+              kfree(mem);
+              printf("Map cow page error!\n");
+              p->killed = 1;
+          }
       }
 
   } else if((which_dev = devintr()) != 0){
