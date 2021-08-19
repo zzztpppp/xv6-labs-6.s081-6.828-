@@ -172,9 +172,9 @@ int
 is_cowpage(pagetable_t pagetable, uint64 va) {
    pte_t *pte;
    if((pte = walk(pagetable, va, 0)) == 0)
-        panic("uvmunmap: walk");
+       return 0;
    if((*pte & PTE_V) == 0)
-        panic("uvmunmap: not mapped");
+       return 0;
 
    return *pte & PTE_COW;
 }
@@ -367,7 +367,7 @@ uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
        if ((*pte & PTE_V) == 0)
            panic("uvmcow: page not present");
 
-       *pte = *pte & (~PTE_W) & PTE_COW;
+       *pte = (*pte & (~PTE_W)) | PTE_COW;
        increment_reference(PTE2PA(*pte));
     }
     return 0;
