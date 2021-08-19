@@ -423,6 +423,23 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+
+    // We are writing to a COW page. Allocate a new physical page to it.
+    if (is_cowpage(pagetable, va0)) {
+        char *mem;
+        pa0 = walkaddr(pagetable, va0);
+        uint64 perm = uvmperm(pagetable, va0);
+        if ((mem = kalloc()) == 0) {
+            return -1;
+        }
+        memmove(mem, (void *)pa0, PGSIZE / sizeof(char));
+
+        uvmunmap(pagetable, va0, 1, 1);
+        if (mappages(pagetable, va0, PGSIZE, (uint64) mem, perm | PTE_W) != 0) {
+            kfree(mem);
+            return -1;
+        }
+    }
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
