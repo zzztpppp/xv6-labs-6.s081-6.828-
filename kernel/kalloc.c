@@ -14,7 +14,7 @@ void freerange(void *pa_start, void *pa_end);
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
 
-uint8 *reference_count;
+uint8 reference_count[NPPAGES];
 struct spinlock reference_lock;
 
 
@@ -28,34 +28,15 @@ struct {
 } kmem;
 
 
-uint64
-refcnt_init() {
-    uint64 pa_start, npages;
-    pa_start = PGROUNDUP((uint64) end);
-    npages = ((uint64) PHYSTOP - pa_start) / PGSIZE;
-
-    // We use a byte to count references of a pa, since the max number of processes is 64, number of
-    // reference will not overflow. This actually takes more space than it needed, but its fine.
-    uint64 size = 8 * npages;
-    printf("size is %d\n", size);
-    reference_count = (uint8 *)end;
-
-    // Initialize reference count to 1 so that freerange can run and decrement reference count.
-    memset(reference_count, 1, size);
-
-    return size;
-}
-
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
   initlock(&reference_lock, "refcnt");
   // Initialize reference count array
-  uint64 size = refcnt_init();
+    memset(reference_count, 1, NPPAGES / sizeof(char));
 
-  // Free memory now begins after reference_count
-  freerange(end + size / sizeof(char), (void*)PHYSTOP);
+  freerange(end, (void*)PHYSTOP);
 }
 
 void
@@ -121,7 +102,7 @@ kalloc(void)
 // Returns the position that page of a pa at in reference_count
 int
 page_at(uint64 pa) {
-   return PGROUNDDOWN(pa - (uint64) end) / PGSIZE;
+   return PGROUNDDOWN(pa - KERNBASE) / PGSIZE;
 }
 
 // Increment reference count of the physical page of a
