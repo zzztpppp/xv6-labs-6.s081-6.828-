@@ -359,13 +359,15 @@ uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
     // Copy ptes from old to new.
     // Remove PTE_W entry and mark the page as a copy-on-write page.
     for (i = 0; i < sz; i += PGSIZE) {
-       new[PX(2, i)] = old[PX(2, i)];
        if ((pte = walk(old, i, 0)) == 0)
            panic("uvmcow: pte should exist");
        if ((*pte & PTE_V) == 0)
            panic("uvmcow: page not present");
 
        *pte = (*pte & (~PTE_W)) | PTE_COW;
+       if (mappages(new, i, PGSIZE, PTE2PA(*pte), PTE_FLAGS(*pte)) != 0) {
+           return -1;
+       }
        increment_reference(PTE2PA(*pte));
     }
     return 0;
@@ -373,7 +375,7 @@ uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
 
 
 // Return permission associated with the page of a given pa.
-int
+uint64
 uvmperm(pagetable_t pagetable, uint64 va) {
     pte_t *pte;
     pte = walk(pagetable, va, 0);
@@ -382,7 +384,7 @@ uvmperm(pagetable_t pagetable, uint64 va) {
     if ((*pte & PTE_V) == 0)
         panic("uvmperm, page not present");
 
-    return PTE_FLAGS(*pte) & PTE_W & PTE_R & PTE_X & PTE_U;
+    return PTE_FLAGS(*pte) & (PTE_W | PTE_R | PTE_X | PTE_U);
 }
 
 // Add a given permission to a page corresponding to the given va.

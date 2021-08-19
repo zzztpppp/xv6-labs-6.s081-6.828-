@@ -167,7 +167,7 @@ uint64          uvmalloc(pagetable_t, uint64, uint64);
 uint64          uvmdealloc(pagetable_t, uint64, uint64);
 int             uvmcopy(pagetable_t, pagetable_t, uint64);
 int             uvmcow(pagetable_t, pagetable_t, uint64);
-int             uvmperm(pagetable_t pagetable, uint64 va);
+uint64 uvmperm(pagetable_t pagetable, uint64 va);
 int             uvmset_perm(pagetable_t pagetable, uint64 va, int perm);
 void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
