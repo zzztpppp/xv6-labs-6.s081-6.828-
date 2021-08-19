@@ -67,29 +67,27 @@ usertrap(void)
     syscall();
   } else if (((r_scause() == 13) || (r_scause() == 15)) && (is_cowpage(p->pagetable, r_stval()))) {
       uint64 va = r_stval();
-      char *mem = kalloc();
-      if (mem == 0) {
-        p->killed = 1;
+      char *mem;
+      uint64  parent_mem = walkaddr(p->pagetable, va);
+      if (parent_mem == 0) {
+          printf("COW page not mapped!\n");
+          p->killed = 1;
+      } else if ((mem = kalloc()) == 0) {
+          p->killed = 1;
       }
       else {
           // Copy memory
-//          printf("cow hit!\n");
-          uint64  parent_mem = walkaddr(p->pagetable, va);
-          if (parent_mem == 0) {
-              printf("COW page not mapped!\n");
-              p->killed = 1;
-          }
           memmove(mem, (void *) parent_mem, PGSIZE);
 
           // Extract permissions of cow page.
           int perm = uvmperm(p->pagetable, va);
-//          printf("%d\n", perm);
+          //          printf("%d\n", perm);
 
           // Decrease reference count of underlying pa. Unmap the cow page from user pagetable
           uvmunmap(p->pagetable, PGROUNDDOWN(va), 1, 1);
 
           // Map the copied page to user pagetable.
-          if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64) mem, perm | PTE_W ) != 0) {
+          if (mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64) mem, perm | PTE_W) != 0) {
               kfree(mem);
               printf("Map cow page error!\n");
               p->killed = 1;
