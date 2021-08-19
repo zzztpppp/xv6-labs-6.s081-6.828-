@@ -352,16 +352,14 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 // in both pagetables.
 int
 uvmcow(pagetable_t old, pagetable_t new, uint64 sz) {
-
-    // Copy ptes from old to new.
     int i;
-    for (i = 0; i < 512; i++) {
-        new[i] = old[i];
-    }
 
     pte_t *pte;
+
+    // Copy ptes from old to new.
     // Remove PTE_W entry and mark the page as a copy-on-write page.
     for (i = 0; i < sz; i += PGSIZE) {
+       new[PX(2, i)] = old[PX(2, i)];
        if ((pte = walk(old, i, 0)) == 0)
            panic("uvmcow: pte should exist");
        if ((*pte & PTE_V) == 0)
