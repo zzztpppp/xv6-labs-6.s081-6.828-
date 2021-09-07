@@ -15,7 +15,7 @@ struct entry {
 };
 
 // Lock on hash table for thread safety
-pthread_mutex_t table_lock;
+pthread_mutex_t table_locks[NBUCKET];
 
 struct entry *table[NBUCKET];
 int keys[NKEYS];
@@ -56,9 +56,9 @@ void put(int key, int value)
   } else {
     // the new is new.
 
-    pthread_mutex_lock(&table_lock);
+    pthread_mutex_lock(&table_locks[i]);
     insert(key, value, &table[i], table[i]);
-    pthread_mutex_unlock(&table_lock);
+    pthread_mutex_unlock(&table_locks[i]);
   }
 }
 
@@ -116,7 +116,9 @@ main(int argc, char *argv[])
   }
 
   // Initialize the lock
-  pthread_mutex_init(&table_lock, NULL);
+  for (int i = 0; i < NBUCKET; i++) {
+      pthread_mutex_init(&table_locks[i], NULL);
+  }
 
   nthread = atoi(argv[1]);
   tha = malloc(sizeof(pthread_t) * nthread);
