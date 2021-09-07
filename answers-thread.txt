@@ -1,0 +1,9 @@
+1. When two threads are executing the  put function, they may have same hash value and both execute insert. While inserting,
+a consecutive operation of *p = e may cause the latter overwrites the former.
+A event sequence of such missing keys may be as follows, where thread_1 over writes the inserted values of thread_2
+thread_1 -------- e->next = n
+thread_2 ---- e->next = n
+thread_2 ---- *p = e
+thread_1 -------- *p = e
+
+
