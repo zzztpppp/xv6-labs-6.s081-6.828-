@@ -13,6 +13,10 @@ struct entry {
   int value;
   struct entry *next;
 };
+
+// Lock on hash table for thread safety
+pthread_mutex_t table_lock;
+
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
@@ -51,7 +55,10 @@ void put(int key, int value)
     e->value = value;
   } else {
     // the new is new.
+
+    pthread_mutex_lock(&table_lock);
     insert(key, value, &table[i], table[i]);
+    pthread_mutex_unlock(&table_lock);
   }
 }
 
@@ -107,6 +114,10 @@ main(int argc, char *argv[])
     fprintf(stderr, "Usage: %s nthreads\n", argv[0]);
     exit(-1);
   }
+
+  // Initialize the lock
+  pthread_mutex_init(&table_lock, NULL);
+
   nthread = atoi(argv[1]);
   tha = malloc(sizeof(pthread_t) * nthread);
   srandom(0);
