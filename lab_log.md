@@ -9,3 +9,11 @@
     
 * Stack grows from a higer address down to a lower address, so need to set `context.sp` to `sp + STACK_STIZE`
 in `create_thread`.
+  
+# Using threads
+* Adding a fine-grained list lock is as fast as moving the lock to around `insert`
+
+# Barrier
+* It's really tricky to get desired behaviour  with locks under multithreading. The hardest thing here
+is to prevent a thread races over the loop and write the `bstate.nthread`. Need a variable to record how  many
+  threads have left the barrier and wake threads that sleep on `cond` after all threads have left the barrier.
