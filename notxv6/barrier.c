@@ -11,6 +11,7 @@ struct barrier {
   pthread_mutex_t barrier_mutex;
   pthread_cond_t barrier_cond;
   int nthread;      // Number of threads that have reached this round of the barrier
+  int nescape;      // Number of threads has left the barrier.
   int round;     // Barrier round
 } bstate;
 
@@ -20,6 +21,7 @@ barrier_init(void)
   assert(pthread_mutex_init(&bstate.barrier_mutex, NULL) == 0);
   assert(pthread_cond_init(&bstate.barrier_cond, NULL) == 0);
   bstate.nthread = 0;
+  bstate.nescape = nthread;    // For first arrival
 }
 
 static void 
@@ -30,6 +32,32 @@ barrier()
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
+  pthread_mutex_lock(&bstate.barrier_mutex);
+  printf("%ld Here1\n", pthread_self());
+  if (bstate.nthread - bstate.round * nthread == 0) {  // First arrival
+      printf("%ld Here2, nthread %d round %d nescaped %d\n", pthread_self(), bstate.nthread, bstate.round, bstate.nescape);
+      while (bstate.nescape != nthread) {
+          pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+      }
+      printf("%ld Here3\n", pthread_self());
+  }
+  bstate.nthread++;
+    printf("%ld Here4\n", pthread_self());
+    if (bstate.nthread - bstate.round * nthread == nthread) {  // Last arrival
+        printf("%ld Here5\n", pthread_self());
+      round = bstate.round++;
+      bstate.nescape = 0;
+      pthread_cond_broadcast(&bstate.barrier_cond);
+  }
+    printf("%ld Here6\n", pthread_self());
+    while (bstate.nthread - round * nthread != nthread) {    // Wait for other threads to arrive
+        printf("%ld Here7\n", pthread_self());
+        printf("Here! nthread %d round %d\n", bstate.nthread, bstate.round);
+      pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+  }
+    printf("%ld Here7\n", pthread_self());
+    bstate.nescape++;
+  pthread_mutex_unlock(&bstate.barrier_mutex);
   
 }
 
@@ -39,9 +67,10 @@ thread(void *xa)
   long n = (long) xa;
   long delay;
   int i;
-
   for (i = 0; i < 20000; i++) {
     int t = bstate.round;
+//    printf("i %d\n", i);
+//    printf("t %d\n", t);
     assert (i == t);
     barrier();
     usleep(random() % 100);
@@ -70,7 +99,7 @@ main(int argc, char *argv[])
 
   for(i = 0; i < nthread; i++) {
     assert(pthread_create(&tha[i], NULL, thread, (void *) i) == 0);
-  }
+}
   for(i = 0; i < nthread; i++) {
     assert(pthread_join(tha[i], &value) == 0);
   }
