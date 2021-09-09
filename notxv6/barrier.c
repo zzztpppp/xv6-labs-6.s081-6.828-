@@ -32,32 +32,25 @@ barrier()
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
-  pthread_mutex_lock(&bstate.barrier_mutex);
-  printf("%ld Here1\n", pthread_self());
-  if (bstate.nthread - bstate.round * nthread == 0) {  // First arrival
-      printf("%ld Here2, nthread %d round %d nescaped %d\n", pthread_self(), bstate.nthread, bstate.round, bstate.nescape);
-      while (bstate.nescape != nthread) {
+      pthread_mutex_lock(&bstate.barrier_mutex);
+      if (bstate.nthread - bstate.round * nthread == 0) {  // First arrival
+          while (bstate.nescape != nthread) {
+              pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+          }
+      }
+      bstate.nthread++;
+        if (bstate.nthread - bstate.round * nthread == nthread) {  // Last arrival
+          round = bstate.round++;
+          bstate.nescape = 0;
+          pthread_cond_broadcast(&bstate.barrier_cond);
+      }
+        while (bstate.nthread - round * nthread != nthread) {    // Wait for other threads to arrive
           pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
       }
-      printf("%ld Here3\n", pthread_self());
-  }
-  bstate.nthread++;
-    printf("%ld Here4\n", pthread_self());
-    if (bstate.nthread - bstate.round * nthread == nthread) {  // Last arrival
-        printf("%ld Here5\n", pthread_self());
-      round = bstate.round++;
-      bstate.nescape = 0;
-      pthread_cond_broadcast(&bstate.barrier_cond);
-  }
-    printf("%ld Here6\n", pthread_self());
-    while (bstate.nthread - round * nthread != nthread) {    // Wait for other threads to arrive
-        printf("%ld Here7\n", pthread_self());
-        printf("Here! nthread %d round %d\n", bstate.nthread, bstate.round);
-      pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
-  }
-    printf("%ld Here7\n", pthread_self());
-    bstate.nescape++;
-  pthread_mutex_unlock(&bstate.barrier_mutex);
+        bstate.nescape++;
+        if (bstate.nescape == nthread)
+            pthread_cond_broadcast(&bstate.barrier_cond);
+        pthread_mutex_unlock(&bstate.barrier_mutex);
   
 }
 
