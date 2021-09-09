@@ -5,7 +5,7 @@
 - [x] Lab Traps
 - [x] Lab Lazy allocation
 - [x] Lab Copy on-write
-- [ ] Lab Multithreading
+- [x] Lab Multithreading
 - [ ] Lab Lock
 - [ ] Lab File system
 - [ ] Lab mmap
