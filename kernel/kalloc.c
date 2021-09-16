@@ -10,6 +10,9 @@
 #include "defs.h"
 
 void freerange(void *pa_start, void *pa_end);
+void *steal(int cid);
+
+int next_to_steal;  // Next cpu to steal from
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
@@ -18,15 +21,23 @@ struct run {
   struct run *next;
 };
 
-struct {
+struct kmem {
   struct spinlock lock;
   struct run *freelist;
-} kmem;
+  int nfree;     // Number of free blocks
+};
+
+// A memory list per CPU to reduce lock contention
+struct kmem kmems[NCPU];
 
 void
 kinit()
 {
-  initlock(&kmem.lock, "kmem");
+  // Initialize locks for each per-cpu free-list
+  for (int i=0; i < NCPU; i++) {
+      initlock(&kmems[i].lock, "kmem");    // Name all cpu locks for 'kmem' for now.
+      kmems[i].nfree = 0;
+  }
   freerange(end, (void*)PHYSTOP);
 }
 
@@ -56,10 +67,14 @@ kfree(void *pa)
 
   r = (struct run*)pa;
 
-  acquire(&kmem.lock);
-  r->next = kmem.freelist;
-  kmem.freelist = r;
-  release(&kmem.lock);
+  push_off();    // Disable interrupts to avoid cpu switch
+  int cid = cpuid();
+  acquire(&kmems[cid].lock);
+  r->next = kmems[cid].freelist;
+  kmems[cid].freelist = r;
+  kmems[cid].nfree++;
+  release(&kmems[cid].lock);
+  pop_off();
 }
 
 // Allocate one 4096-byte page of physical memory.
@@ -70,13 +85,35 @@ kalloc(void)
 {
   struct run *r;
 
-  acquire(&kmem.lock);
-  r = kmem.freelist;
-  if(r)
-    kmem.freelist = r->next;
-  release(&kmem.lock);
+  push_off();
+  int cid = cpuid();
+  acquire(&kmems[cid].lock);
+  r = kmems[cid].freelist;
+  if(r) {
+      kmems[cid].freelist = r->next;
+      kmems[cid].nfree--;
+  }
+  else {
+      steal(cid);
+  }
+  release(&kmems[cid].lock);
+  pop_off();
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
+}
+
+// Steal memory blocks from other cpus to the cpu with given cid
+void *
+steal(int cid) {
+    static int rover;    // Next to search
+    int old_rover = rover;
+    struct run *goods = 0;
+
+    // Next fit search
+    for (rover; rover < NCPU;rover++) {
+        if (kmems[rover].nfree > 0){}
+
+    }
 }
