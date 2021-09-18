@@ -10,9 +10,7 @@
 #include "defs.h"
 
 void freerange(void *pa_start, void *pa_end);
-void *steal(int cid);
-
-int next_to_steal;  // Next cpu to steal from
+void *steal();
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
@@ -92,28 +90,62 @@ kalloc(void)
   if(r) {
       kmems[cid].freelist = r->next;
       kmems[cid].nfree--;
+      release(&kmems[cid].lock);
   }
   else {
-      steal(cid);
+      release(&kmems[cid].lock);
+      r = steal(cid);
   }
-  release(&kmems[cid].lock);
   pop_off();
+//  printf("%p\n", r);
 
-  if(r)
+    if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
 
-// Steal memory blocks from other cpus to the cpu with given cid
+
+// Do the actual steal job, the given cid's freelist
+// must not be empty. And the memory lock must be held.
 void *
-steal(int cid) {
+do_steal(int cid) {
+    struct run *goods;
+
+    acquire(&kmems[cid].lock);
+//    printf("cid: %d nfree: %d\n",cid , kmems[cid].nfree);
+    if (kmems[cid].nfree > 0) {
+        goods = kmems[cid].freelist;
+        kmems[cid].freelist = goods->next;
+        kmems[cid].nfree--;
+    }
+    else {
+        goods = (void *)0;
+    }
+    release(&kmems[cid].lock);
+    return goods;
+}
+
+// Steal memory blocks from other cpus to the cpu with given cid
+// Must be called when interrupts are disabled.
+void *
+steal() {
     static int rover;    // Next to search
     int old_rover = rover;
-    struct run *goods = 0;
+    struct run *goods;
 
     // Next fit search
-    for (rover; rover < NCPU;rover++) {
-        if (kmems[rover].nfree > 0){}
-
+    for (; rover < NCPU; rover++) {
+        if ((goods = do_steal(rover))) {
+//            printf("%p\n", goods);
+            return goods;
+        }
     }
+
+    // Search from beginning
+    for (rover = 0; rover < old_rover; rover++) {
+        if ((goods = do_steal(rover)))
+            return goods;
+    }
+
+    return (void *) 0;
 }
