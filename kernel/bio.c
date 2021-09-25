@@ -1,4 +1,4 @@
-// Buffer cache.
+
 //
 // The buffer cache is a linked list of buf structures holding
 // cached copies of disk block contents.  Caching disk blocks
@@ -23,34 +23,111 @@
 #include "fs.h"
 #include "buf.h"
 
+#define NBUCKET 13   // 13 hash-table buckets
+
+
+static char lock_names[NBUCKET * 16];    // Lock names for each hash table slots
+
 struct {
   struct spinlock lock;
   struct buf buf[NBUF];
+  int slot_id[NBUF];    // Which hash-table slot is each buf cached, -1 means it doesn't belong to any slot.
 
-  // Linked list of all buffers, through prev/next.
-  // Sorted by how recently the buffer was used.
-  // head.next is most recent, head.prev is least.
-  struct buf head;
 } bcache;
 
+struct {
+    struct buf *table_slots[NBUCKET];
+    struct spinlock locks[NBUCKET];
+
+} bcache_table;
+
+
+// Lock all slot locks in bcache_table
 void
-binit(void)
-{
-  struct buf *b;
-
-  initlock(&bcache.lock, "bcache");
-
-  // Create linked list of buffers
-  bcache.head.prev = &bcache.head;
-  bcache.head.next = &bcache.head;
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
-  }
+lock_all(void) {
+   int i;
+   acquire(&bcache.lock);
+   for (i = 0; i < NBUCKET; i++) {
+       acquire(&bcache_table.locks[i]);
+   }
 }
+
+// Release all slot locks in bcache_table
+void
+release_all(void) {
+    int i;
+    release(&bcache.lock);
+    for (i = 0; i < NBUCKET; i++) {
+        release(&bcache_table.locks[i]);
+    }
+}
+
+void
+binit(void) {
+    int i;
+
+    initlock(&bcache.lock, "bcache");    // Preserve the old global lock for debug purposes.
+    // Initialize table slot locks
+    // and slots.
+    for (i = 0; i < NBUCKET; i++) {
+        bcache_table.table_slots[i] = 0;
+        snprintf(lock_names + i * 16, 16, "bacahe_%d", i);
+    }
+
+    // Initialize buffer timestamp and slot ids.
+    for (i = 0; i < NBUF; i++) {
+        initsleeplock(&bcache.buf[i].lock, "buffer");
+        bcache.buf[i].timestamp = ticks;
+        bcache.slot_id[i] = -1;
+    }
+}
+
+static struct buf*
+bget(uint dev, uint blockno) {
+    struct buf *b;
+    acquire(&bcache.lock);
+    uint slot = blockno % NBUCKET;
+    acquire(&bcache_table.locks[slot]);
+
+    // Is the block cached?
+    for (b=bcache_table.table_slots[slot]; b != 0; b=b->next) {
+        if(b->dev == dev && b->blockno == blockno){
+            b->refcnt++;
+            b->timestamp = ticks;
+            release(&bcache.lock);
+            release(&bcache_table.locks[slot]);
+            acquiresleep(&b->lock);
+            return b;
+        }
+    }
+
+    // Not cached.
+    // Recycle the least recently used unused buffer.
+    // The recycle step is serial since we are holding the global bcache.lock
+    uint least_ticks = ticks;
+    int eviction_i = -1;
+    lock_all();
+    for (int i = 0; i < NBUF; i++) {
+        if ((bcache.buf[i].refcnt == 0) && (bcache.buf[i].timestamp < least_ticks)) {
+            eviction_i = i;
+            least_ticks = bcache.buf[i].timestamp;
+        }
+    }
+    if (eviction_i == -1)
+        panic("bget: no buffers");
+    // Move the block to the new hashing slot if it now hashes to a different slots
+    if (bcache.slot_id[eviction_i] != slot) {
+        if (bcache.slot_id[eviction_i] != -1) {
+
+        }
+    }
+    release_all();
+
+
+    acquiresleep(&b->lock);
+    return b;
+}
+
 
 // Look through buffer cache for block on device dev.
 // If not found, allocate a buffer.
