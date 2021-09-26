@@ -72,6 +72,7 @@ binit(void) {
     for (i = 0; i < NBUCKET; i++) {
         bcache_table.table_slots[i] = 0;
         snprintf(lock_names + i * 16, 16, "bacahe_%d", i);
+        initlock(&bcache_table.locks[i], lock_names + i * 16);
     }
 
     // Initialize buffer timestamp and slot ids.
@@ -127,7 +128,6 @@ insert_block(uint slot, struct buf *block) {
 static struct buf*
 bget(uint dev, uint blockno) {
     struct buf *b;
-    acquire(&bcache.lock);
     int slot = (int) blockno % NBUCKET;
     acquire(&bcache_table.locks[slot]);
 
@@ -135,13 +135,11 @@ bget(uint dev, uint blockno) {
     for (b=bcache_table.table_slots[slot]; b != 0; b=b->next) {
         if(b->dev == dev && b->blockno == blockno){
             b->refcnt++;
-            release(&bcache.lock);
             release(&bcache_table.locks[slot]);
             acquiresleep(&b->lock);
             return b;
         }
     }
-    release(&bcache.lock);
     release(&bcache_table.locks[slot]);
 
     // Not cached.
@@ -211,13 +209,12 @@ brelse(struct buf *b) {
     if(!holdingsleep(&b->lock))
         panic("brelse");
 
-    releasesleep(&b->lock);
-    acquire(&bcache.lock);
     b->refcnt--;
     if (b->refcnt == 0) {
         b->timestamp = ticks;
     }
-    release(&bcache.lock);
+
+    releasesleep(&b->lock);
 
 }
 
