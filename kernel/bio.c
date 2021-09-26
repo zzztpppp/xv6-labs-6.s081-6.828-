@@ -126,14 +126,13 @@ static struct buf*
 bget(uint dev, uint blockno) {
     struct buf *b;
     acquire(&bcache.lock);
-    uint slot = blockno % NBUCKET;
+    int slot = (int) blockno % NBUCKET;
     acquire(&bcache_table.locks[slot]);
 
     // Is the block cached?
     for (b=bcache_table.table_slots[slot]; b != 0; b=b->next) {
         if(b->dev == dev && b->blockno == blockno){
             b->refcnt++;
-            b->timestamp = ticks;    // TODO: Move timestamp update into brelse
             release(&bcache.lock);
             release(&bcache_table.locks[slot]);
             acquiresleep(&b->lock);
@@ -170,48 +169,13 @@ bget(uint dev, uint blockno) {
         }
         // Insert to the head of the new slot
         insert_block(slot, b);
+        bcache.slot_id[eviction_i] = slot;
     }
     release_all();
     acquiresleep(&b->lock);
     return b;
 }
 
-
-// Look through buffer cache for block on device dev.
-// If not found, allocate a buffer.
-// In either case, return locked buffer.
-static struct buf*
-bget(uint dev, uint blockno)
-{
-  struct buf *b;
-
-  acquire(&bcache.lock);
-
-  // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
-      b->refcnt++;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
-    }
-  }
-
-  // Not cached.
-  // Recycle the least recently used (LRU) unused buffer.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
-    }
-  }
-  panic("bget: no buffers");
-}
 
 // Return a locked buf with the contents of the indicated block.
 struct buf*
@@ -239,26 +203,18 @@ bwrite(struct buf *b)
 // Release a locked buffer.
 // Move to the head of the most-recently-used list.
 void
-brelse(struct buf *b)
-{
-  if(!holdingsleep(&b->lock))
-    panic("brelse");
+brelse(struct buf *b) {
+    if(!holdingsleep(&b->lock))
+        panic("brelse");
 
-  releasesleep(&b->lock);
+    releasesleep(&b->lock);
+    acquire(&bcache.lock);
+    b->refcnt--;
+    if (b->refcnt == 0) {
+        b->timestamp = ticks;
+    }
+    release(&bcache.lock);
 
-  acquire(&bcache.lock);
-  b->refcnt--;
-  if (b->refcnt == 0) {
-    // no one is waiting for it.
-    b->next->prev = b->prev;
-    b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
-  }
-  
-  release(&bcache.lock);
 }
 
 void
