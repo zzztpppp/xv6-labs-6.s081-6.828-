@@ -99,8 +99,10 @@ remove_block(uint slot, struct buf *block) {
 
         // If we are removing head
         if (b == bcache_table.table_slots[slot]) {
-            bcache_table.table_slots[slot] = b;
+            bcache_table.table_slots[slot] = b->next;
         }
+
+        return;
     }
 
     // Wrong slot
@@ -139,6 +141,8 @@ bget(uint dev, uint blockno) {
             return b;
         }
     }
+    release(&bcache.lock);
+    release(&bcache_table.locks[slot]);
 
     // Not cached.
     // Recycle the least recently used unused buffer.
@@ -147,7 +151,7 @@ bget(uint dev, uint blockno) {
     int eviction_i = -1;
     lock_all();
     for (int i = 0; i < NBUF; i++) {
-        if ((bcache.buf[i].refcnt == 0) && (bcache.buf[i].timestamp < least_ticks)) {
+        if ((bcache.buf[i].refcnt == 0) && (bcache.buf[i].timestamp <= least_ticks)) {
             eviction_i = i;
             least_ticks = bcache.buf[i].timestamp;
         }
