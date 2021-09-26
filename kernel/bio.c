@@ -82,6 +82,46 @@ binit(void) {
     }
 }
 
+// Remove a block with given dev and blockno
+// from the given table slot.
+// Necessary locks must be acquired before calling this function
+static void
+remove_block(uint slot, struct buf *block) {
+    struct buf *b;
+    for (b = bcache_table.table_slots[slot]; b != 0; b = b->next) {
+        if (b != block)
+            continue;
+
+        if (b->prev != 0)
+            b->prev->next = b->next;
+        if (b->next !=0 )
+            b->next->prev = b->prev;
+
+        // If we are removing head
+        if (b == bcache_table.table_slots[slot]) {
+            bcache_table.table_slots[slot] = b;
+        }
+    }
+
+    // Wrong slot
+    panic("bcache: remove failed");
+}
+
+
+// Insert a block into a given slot.
+// Necessary locks must be acquired before calling this function
+static void
+insert_block(uint slot, struct buf *block) {
+    // Not a empty slot
+   if (bcache_table.table_slots[slot] != 0)
+       bcache_table.table_slots[slot]->prev = block;
+
+    block->next = bcache_table.table_slots[slot];
+    block->prev = 0;
+   bcache_table.table_slots[slot] = block;
+}
+
+
 static struct buf*
 bget(uint dev, uint blockno) {
     struct buf *b;
@@ -93,7 +133,7 @@ bget(uint dev, uint blockno) {
     for (b=bcache_table.table_slots[slot]; b != 0; b=b->next) {
         if(b->dev == dev && b->blockno == blockno){
             b->refcnt++;
-            b->timestamp = ticks;
+            b->timestamp = ticks;    // TODO: Move timestamp update into brelse
             release(&bcache.lock);
             release(&bcache_table.locks[slot]);
             acquiresleep(&b->lock);
@@ -113,17 +153,25 @@ bget(uint dev, uint blockno) {
             least_ticks = bcache.buf[i].timestamp;
         }
     }
+
     if (eviction_i == -1)
         panic("bget: no buffers");
-    // Move the block to the new hashing slot if it now hashes to a different slots
-    if (bcache.slot_id[eviction_i] != slot) {
-        if (bcache.slot_id[eviction_i] != -1) {
+    b = &bcache.buf[eviction_i];
+    b->dev = dev;
+    b->blockno = blockno;
+    b->valid = 0;
+    b->refcnt = 1;
 
+    // Move the block to the new hashing slot if it now hashes to a different slot
+    int current_slot = bcache.slot_id[eviction_i];
+    if (current_slot != slot) {
+        if (current_slot != -1) {  // Remove from the old slot if there is one
+            remove_block(current_slot, b);
         }
+        // Insert to the head of the new slot
+        insert_block(slot, b);
     }
     release_all();
-
-
     acquiresleep(&b->lock);
     return b;
 }
