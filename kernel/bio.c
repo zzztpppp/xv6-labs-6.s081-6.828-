@@ -42,26 +42,6 @@ struct {
 } bcache_table;
 
 
-// Lock all slot locks in bcache_table
-void
-lock_all(void) {
-   int i;
-   acquire(&bcache.lock);
-   for (i = 0; i < NBUCKET; i++) {
-       acquire(&bcache_table.locks[i]);
-   }
-}
-
-// Release all slot locks in bcache_table
-void
-release_all(void) {
-    int i;
-    release(&bcache.lock);
-    for (i = 0; i < NBUCKET; i++) {
-        release(&bcache_table.locks[i]);
-    }
-}
-
 void
 binit(void) {
     int i;
