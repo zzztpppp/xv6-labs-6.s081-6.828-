@@ -41,6 +41,26 @@ struct {
 } bcache_table;
 
 
+// Lock all slot locks in bcache_table
+void
+lock_all(void) {
+   int i;
+   acquire(&bcache.lock);
+   for (i = 0; i < NBUCKET; i++) {
+       acquire(&bcache_table.locks[i]);
+   }
+}
+
+// Release all slot locks in bcache_table
+void
+release_all(void) {
+    int i;
+    release(&bcache.lock);
+    for (i = 0; i < NBUCKET; i++) {
+        release(&bcache_table.locks[i]);
+    }
+}
+
 void
 binit(void) {
     int i;
@@ -67,7 +87,7 @@ binit(void) {
 static void
 remove_block(uint slot, struct buf *block) {
     struct buf *b;
-    acquire(&bcache_table.locks[slot]);
+//    acquire(&bcache_table.locks[slot]);
     for (b = bcache_table.table_slots[slot]; b != 0; b = b->next) {
         if (b != block)
             continue;
@@ -82,7 +102,7 @@ remove_block(uint slot, struct buf *block) {
             bcache_table.table_slots[slot] = b->next;
         }
 
-        release(&bcache_table.locks[slot]);
+//        release(&bcache_table.locks[slot]);
         return;
     }
 
@@ -95,14 +115,14 @@ remove_block(uint slot, struct buf *block) {
 static void
 insert_block(uint slot, struct buf *block) {
     // Not a empty slot
-    acquire(&bcache_table.locks[slot]);
+//    acquire(&bcache_table.locks[slot]);
    if (bcache_table.table_slots[slot] != 0)
        bcache_table.table_slots[slot]->prev = block;
 
     block->next = bcache_table.table_slots[slot];
     block->prev = 0;
     bcache_table.table_slots[slot] = block;
-    release(&bcache_table.locks[slot]);
+//    release(&bcache_table.locks[slot]);
 }
 
 
@@ -110,6 +130,7 @@ static struct buf*
 bget(uint dev, uint blockno) {
     struct buf *b;
     int slot = (int) blockno % NBUCKET;
+//    acquire(&bcache.lock);
     acquire(&bcache_table.locks[slot]);
 
     // Is the block cached?
@@ -121,24 +142,33 @@ bget(uint dev, uint blockno) {
             return b;
         }
     }
-    release(&bcache_table.locks[slot]);
 
+    release(&bcache_table.locks[slot]);
     // Not cached.
     // Recycle the least recently used unused buffer.
     // The recycle step is serial since we are holding the global bcache.lock
-    uint least_ticks = ticks;
-    int eviction_i = -1;
-    acquire(&bcache.lock);
-    for (int i = 0; i < NBUF; i++) {
-        if ((bcache.buf[i].refcnt == 0) && (bcache.buf[i].timestamp <= least_ticks)) {
-            eviction_i = i;
-            least_ticks = bcache.buf[i].timestamp;
+    lock_all();
+    // Scan again to make sure other threads don't cache the block before we acquire all the locks.
+    for (b=bcache_table.table_slots[slot]; b != 0; b=b->next) {
+        if(b->dev == dev && b->blockno == blockno){
+            b->refcnt++;
+            release_all();
+            acquiresleep(&b->lock);
+            return b;
         }
     }
 
-    if (eviction_i == -1)
+    uint least_ticks = ticks;
+    b = 0;
+    for (int i = 0; i < NBUF; i++) {
+        if ((bcache.buf[i].refcnt == 0) && (bcache.buf[i].timestamp <= least_ticks)) {
+            b = &bcache.buf[i];
+            least_ticks = b->timestamp;
+        }
+    }
+
+    if (b == 0)
         panic("bget: no buffers");
-    b = &bcache.buf[eviction_i];
     b->dev = dev;
     b->blockno = blockno;
     b->valid = 0;
@@ -154,7 +184,7 @@ bget(uint dev, uint blockno) {
         insert_block(slot, b);
         b->slot = slot;
     }
-    release(&bcache.lock);
+    release_all();
     acquiresleep(&b->lock);
     return b;
 }
@@ -189,12 +219,13 @@ void
 brelse(struct buf *b) {
     if(!holdingsleep(&b->lock))
         panic("brelse");
-
+    acquire(&bcache_table.locks[b->slot]);
+    releasesleep(&b->lock);
     b->refcnt--;
     if (b->refcnt == 0) {
         b->timestamp = ticks;
     }
-    releasesleep(&b->lock);
+    release(&bcache_table.locks[b->slot]);
 
 }
 

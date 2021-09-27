@@ -4,6 +4,7 @@ struct buf {
   uint dev;
   uint blockno;
   uint timestamp;  // when is the buffer recently used.
+  int slot;        // The hashing slot the buffer belongs to.
   struct sleeplock lock;
   uint refcnt;
   struct buf *prev; // LRU cache list
