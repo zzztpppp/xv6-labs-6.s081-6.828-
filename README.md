@@ -6,7 +6,7 @@
 - [x] Lab Lazy allocation
 - [x] Lab Copy on-write
 - [x] Lab Multithreading
-- [ ] Lab Lock
+- [x] Lab Lock
 - [ ] Lab File system
 - [ ] Lab mmap
 - [ ] Lab Network driver
