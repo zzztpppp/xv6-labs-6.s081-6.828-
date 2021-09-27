@@ -31,7 +31,6 @@ static char lock_names[NBUCKET * 16];    // Lock names for each hash table slots
 struct {
   struct spinlock lock;
   struct buf buf[NBUF];
-  int slot_id[NBUF];    // Which hash-table slot is each buf cached, -1 means it doesn't belong to any slot.
 
 } bcache;
 
@@ -59,13 +58,12 @@ binit(void) {
     for (i = 0; i < NBUF; i++) {
         initsleeplock(&bcache.buf[i].lock, "buffer");
         bcache.buf[i].timestamp = ticks;
-        bcache.slot_id[i] = -1;
+        bcache.buf[i].slot = -1;
     }
 }
 
 // Remove a block with given dev and blockno
 // from the given table slot.
-// Necessary locks must be acquired before calling this function
 static void
 remove_block(uint slot, struct buf *block) {
     struct buf *b;
@@ -94,7 +92,6 @@ remove_block(uint slot, struct buf *block) {
 
 
 // Insert a block into a given slot.
-// Necessary locks must be acquired before calling this function
 static void
 insert_block(uint slot, struct buf *block) {
     // Not a empty slot
@@ -148,14 +145,14 @@ bget(uint dev, uint blockno) {
     b->refcnt = 1;
 
     // Move the block to the new hashing slot if it now hashes to a different slot
-    int current_slot = bcache.slot_id[eviction_i];
+    int current_slot = b->slot;
     if (current_slot != slot) {
         if (current_slot != -1) {  // Remove from the old slot if there is one
             remove_block(current_slot, b);
         }
         // Insert to the head of the new slot
         insert_block(slot, b);
-        bcache.slot_id[eviction_i] = slot;
+        b->slot = slot;
     }
     release(&bcache.lock);
     acquiresleep(&b->lock);
