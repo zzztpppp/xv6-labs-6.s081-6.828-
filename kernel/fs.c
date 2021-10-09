@@ -378,7 +378,7 @@ static uint
 bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
-  struct buf *bp;
+  struct buf *bp, *bp2;
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
@@ -400,7 +400,29 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
-  // TODO: Add code here to map to doubly-linked indirect blocks
+
+  bn -= NINDIRECT;
+  if (bn < NDINDIRECT) {
+      if ((addr = ip->addrs[NDIRECT + 1]) == 0)
+          ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
+      bp = bread(ip->dev, addr);
+      a = (uint*)bp->data;
+      if ((addr = a[bn / NINDIRECT]) == 0) {
+          a[bn / NINDIRECT] = addr = balloc(ip->dev);
+          log_write(bp);
+      }
+
+      // Level 2 at the double-indirect list
+      bp2 = bread(ip->dev, addr);
+      a = (uint*)bp2->data;
+      if ((addr = a[bn % NINDIRECT]) == 0) {
+          a[bn % NINDIRECT] = addr = balloc(ip->dev);
+          log_write(bp2);
+      }
+      brelse(bp2);
+      brelse(bp);
+      return addr;
+  }
 
   panic("bmap: out of range");
 }
@@ -411,8 +433,8 @@ void
 itrunc(struct inode *ip)
 {
   int i, j;
-  struct buf *bp;
-  uint *a;
+  struct buf *bp, *bp2;
+  uint *a, *b;
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -434,6 +456,26 @@ itrunc(struct inode *ip)
   }
 
   // TODO: Add code here truncate the doubly-linked indirect blocks
+  if (ip->addrs[NDIRECT + 1]) {
+      bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
+      a = (uint*)bp->data;
+      for (i = 0; i < NINDIRECT; i++) {
+          // Truncate level 2 of the double-indirect list.
+          if (a[i]) {
+              bp2 = bread(ip->dev, a[i]);
+              b = (uint *) bp2->data;
+              for (j = 0; j < NINDIRECT; j++) {
+                  if (b[j]) {
+                      bfree(ip->dev, b[j]);
+                  }
+              }
+              brelse(bp2);
+              bfree(ip->dev, a[i]);
+          }
+      }
+      brelse(bp);
+      bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+  }
 
   ip->size = 0;
   iupdate(ip);
