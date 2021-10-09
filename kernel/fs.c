@@ -400,6 +400,7 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
+  // TODO: Add code here to map to doubly-linked indirect blocks
 
   panic("bmap: out of range");
 }
@@ -431,6 +432,8 @@ itrunc(struct inode *ip)
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
   }
+
+  // TODO: Add code here truncate the doubly-linked indirect blocks
 
   ip->size = 0;
   iupdate(ip);
