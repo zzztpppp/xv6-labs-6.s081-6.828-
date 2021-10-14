@@ -165,6 +165,36 @@ bad:
   return -1;
 }
 
+uint64
+sys_symlink(char *target, char *path) {
+    char name[DIRSIZ];
+    struct inode *dp, *ip;
+
+    // Return error if the path already exists.
+    if (namei(path) != 0) {
+        return -1;
+    }
+    if ((dp = nameiparent(path, name)) == 0) {
+        return -1;
+    }
+    begin_op();
+    if ((ip = ialloc(dp->dev, T_SYMLINK)) == 0) {
+        end_op();
+        return -1;
+    }
+    ilock(dp);
+    if (dirlink(dp, name, ip->inum) == 0) {
+        end_op();
+        return -1;
+    }
+    iunlock(dp);
+    ilock(ip);
+    writei(ip, 0, (uint64) name, 0, DIRSIZ);
+    iunlock(ip);
+    end_op();
+    return 0;
+}
+
 // Is the directory dp empty except for "." and ".." ?
 static int
 isdirempty(struct inode *dp)
