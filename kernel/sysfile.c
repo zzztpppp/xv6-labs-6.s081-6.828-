@@ -166,9 +166,13 @@ bad:
 }
 
 uint64
-sys_symlink(char *target, char *path) {
-    char name[DIRSIZ];
+sys_symlink(void) {
+
+    char name[DIRSIZ], target[MAXPATH], path[MAXPATH];
     struct inode *dp, *ip;
+
+    if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+        return -1;
 
     // Return error if the path already exists.
     if (namei(path) != 0) {
@@ -183,13 +187,13 @@ sys_symlink(char *target, char *path) {
         return -1;
     }
     ilock(dp);
-    if (dirlink(dp, name, ip->inum) == 0) {
+    if (dirlink(dp, name, ip->inum) < 0) {
         end_op();
         return -1;
     }
     iunlock(dp);
     ilock(ip);
-    writei(ip, 0, (uint64) name, 0, DIRSIZ);
+    writei(ip, 0, (uint64) target, 0, MAXPATH);
     iunlock(ip);
     end_op();
     return 0;
@@ -313,6 +317,18 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
+// Read inode the symbolic link pointing to.
+static struct inode *
+follow_sym(struct inode *symnode) {
+    char target_path[MAXPATH];
+    struct inode *ip;
+    ilock(symnode);
+    readi(symnode, 0, (uint64)target_path, 0, MAXPATH);
+    iunlock(symnode);
+    ip = namei(target_path);
+    return ip;
+}
+
 uint64
 sys_open(void)
 {
@@ -350,6 +366,26 @@ sys_open(void)
     iunlockput(ip);
     end_op();
     return -1;
+  }
+
+  // Follow the symbolic link to its destination if `O_NOFOLLOW` not specified.
+  if (ip->type == T_SYMLINK && ~(omode & O_NOFOLLOW)) {
+      struct inode *temp_ip = ip;
+      // If the depth is more than 10, we suspect its a cycle and stop
+      for (int i = 0; i < 10; i++) {
+          temp_ip = follow_sym(temp_ip);
+          if (temp_ip == 0) {
+              iunlock(ip);
+              return -1;
+          }
+          if (temp_ip->type != T_SYMLINK)
+              break;
+      }
+      // Potentially a cycle.
+      if (temp_ip->type == T_SYMLINK) {
+          return -1;
+      }
+      ip = temp_ip;
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
