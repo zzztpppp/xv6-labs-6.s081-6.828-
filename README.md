@@ -7,6 +7,6 @@
 - [x] Lab Copy on-write
 - [x] Lab Multithreading
 - [x] Lab Lock
-- [ ] Lab File system
+- [x] Lab File system
 - [ ] Lab mmap
 - [ ] Lab Network driver
