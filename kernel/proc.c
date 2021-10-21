@@ -128,6 +128,11 @@ found:
     return 0;
   }
 
+  // Initialize vma table
+  for (int i = 0; i < NOFILE; i++) {
+      p->vmatable[i].file = 0;
+  }
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -351,6 +356,13 @@ exit(int status)
       fileclose(f);
       p->ofile[fd] = 0;
     }
+  }
+
+  // Unmap all regions in vma tables.
+  for (int i = 0; i < NOFILE; i++) {
+      if (p->vmatable[i].file != 0) {
+          munmap(p->vmatable[i].addr, p->vmatable[i].length);
+      }
   }
 
   begin_op();
