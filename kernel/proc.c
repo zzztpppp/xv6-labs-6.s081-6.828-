@@ -265,6 +265,20 @@ growproc(int n)
   return 0;
 }
 
+// Grow user memory by n bytes lazily.
+// Accesses to lazily allocated regions will cause page faults.
+int
+growproc_lazy(int n) {
+   uint sz, old_sz;
+   struct proc *p = myproc();
+   old_sz = PGROUNDUP(p->sz);
+   // Not support lazy dealloc and alloc exceeds MAXVA
+   if (n < 0 || (sz = (n + old_sz)) < old_sz)
+       return -1;
+   p->sz = sz;
+   return 0;
+}
+
 // Create a new process, copying the parent.
 // Sets up child kernel stack to return as if from fork() system call.
 int
@@ -712,4 +726,17 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// Return the vma that contains this address if any.
+struct vma *
+vma_at(uint64 addr) {
+    struct proc *p = myproc();
+    struct vma *v;
+    for (int i = 0; i < NOFILE; i++) {
+        v = &p->vmatable[i];
+        if (v->file != 0 && (v->addr >= addr && addr <= v->addr + v->length))
+            return v;
+    }
+    return 0;
 }
