@@ -429,17 +429,3 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
-
-
-// Memory map a file to an address space starting at `addr` with given length
-uint64
-mmap(uint64 addr, uint64 length, int prot, int flags, int fd, uint64 offset) {
-
-}
-
-
-// Un-map a memory mapped region
-int
-munmap(uint64 addr, uint64 length) {
-
-}

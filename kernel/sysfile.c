@@ -484,3 +484,77 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void){
+    uint64 addr;
+    struct file *f;
+    int length, prot, flag, fd, offset, i;
+    struct vma v;
+    argaddr(0, &addr);
+    argint(1, &length);
+    argint(2, &prot);
+    argint(3, &flag);
+    argfd(4, &fd, &f);
+    argint(5, &offset);
+
+    struct proc *p = myproc();
+
+    // Find a empty vma
+    for (i = 0; i < NOFILE; i++) {
+        if (p->vmatable[i].file == 0)
+            break;
+        if (i == NOFILE - 1)
+            return -1;
+    }
+    v = p->vmatable[i];
+    filedup(f);
+    v.file = f;
+    v.addr = PGROUNDUP(p->sz);
+    v.length = length;
+
+    // Arrange mapped region.
+    growproc_lazy(length);
+    return 0;
+}
+
+uint64
+sys_munmap(void){
+    uint64 addr, start = addr;
+    int length;
+    struct vma *v;
+
+    argaddr(0, &addr);
+    argint(1, &length);
+    // Addr must be a multiple of the page size
+    if ((addr & (PGSIZE - 1)) != 0)
+        return -1;
+
+    // All pages containing a part of the
+    // indicated range are unmapped. Assume
+    // the specified ranges are all in the same
+    // vma and will not punch a hole int he middle of
+    // the area.
+    if ((v = vma_at(addr)) == 0)
+        return -1;
+
+    // Write dirty data back to file if MAP_SHARED
+    // The dirty bit check is ignored.
+    filewrite(v->file, addr, length);
+
+    // Shrink vma in the unit of page
+    length = PGROUNDUP(length);
+    if (addr == v->addr)    // At the start of the vma.
+        v->addr += length;
+    v->length -= length;
+
+    uvmunmap(myproc()->pagetable, addr, length / PGSIZE, 1);
+
+    // The whole area if removed.
+    // Close the file, clear the vma.
+    if (length <= 0) {
+        fileclose(v->file);
+        v->file = 0;
+    }
+    return 0;
+}
