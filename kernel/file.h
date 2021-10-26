@@ -38,3 +38,16 @@ struct devsw {
 extern struct devsw devsw[];
 
 #define CONSOLE 1
+
+// Virtual-memory-area(VMA)
+struct vma {
+    struct file * file;     // File the vma corresponds to.
+    int free;               // A free vma
+    uint64 addr;            // Mmapped address.
+    uint64 length;          // Size of the mapped region
+    uint64 permission;      // Permission of mmapped pages(PROT_READ, PROT_WRITE, etc.).
+    uint64 flags;           // Is the modification written back to the file?
+    uint64 offset;          // Offset where we want to mapped the file.
+    int idx;                // Index of the process's vma table.
+};
+

@@ -3,8 +3,11 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "file.h"
 
 struct cpu cpus[NCPU];
 
@@ -126,11 +129,6 @@ found:
     freeproc(p);
     release(&p->lock);
     return 0;
-  }
-
-  // Initialize vma table
-  for (int i = 0; i < NOFILE; i++) {
-      p->vmatable[i].file = 0;
   }
 
   // Set up new context to start executing at forkret,
@@ -272,7 +270,7 @@ growproc_lazy(int n) {
    uint sz, old_sz;
    struct proc *p = myproc();
    old_sz = PGROUNDUP(p->sz);
-   // Not support lazy dealloc and alloc exceeds MAXVA
+   // Not supporting lazy dealloc and alloc exceeds MAXVA
    if (n < 0 || (sz = (n + old_sz)) < old_sz)
        return -1;
    p->sz = sz;
@@ -374,8 +372,8 @@ exit(int status)
 
   // Unmap all regions in vma tables.
   for (int i = 0; i < NOFILE; i++) {
-      if (p->vmatable[i].file != 0) {
-          munmap(p->vmatable[i].addr, p->vmatable[i].length);
+      if (p->vmatable[i]) {
+          munmap(p->vmatable[i]->addr, p->vmatable[i]->length);
       }
   }
 
@@ -726,17 +724,4 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
-}
-
-// Return the vma that contains this address if any.
-struct vma *
-vma_at(uint64 addr) {
-    struct proc *p = myproc();
-    struct vma *v;
-    for (int i = 0; i < NOFILE; i++) {
-        v = &p->vmatable[i];
-        if (v->file != 0 && (v->addr >= addr && addr <= v->addr + v->length))
-            return v;
-    }
-    return 0;
 }

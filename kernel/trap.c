@@ -3,8 +3,12 @@
 #include "memlayout.h"
 #include "riscv.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "fs.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -27,6 +31,41 @@ void
 trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
+}
+
+// Handles page store and load fault
+static void
+hanlde_pagefault() {
+    uint64 addr = r_stval();
+    struct proc *p = myproc();
+    struct vma *v;
+    if ((v = vma_at(addr, 0)) == 0) {
+        printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+        printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+        p->killed = 1;
+        return;
+    }
+
+    // Allocate a physical page and map the page.
+    char *pa;
+    if ((pa = kalloc()) == 0)
+        panic("Not enough memory");
+    uint64 perm = PTE_U;
+    if (v->permission & PROT_EXEC)
+        perm = perm | PTE_X;
+    if (v->permission & PROT_READ)
+        perm = perm | PTE_R;
+    if (v->permission | PROT_WRITE)
+        perm = perm | PTE_W;
+
+    mappages(p->pagetable, addr, PGSIZE, (uint64)pa, (int)perm);
+
+    // Fill one page with the content in the mapped file.
+    addr = PGROUNDDOWN(v->offset + addr);
+    ilock(v->file->ip);
+    readi(v->file->ip, 1, addr, addr - v->addr + v->offset, PGSIZE);
+    iunlock(v->file->ip);
+
 }
 
 //
@@ -65,7 +104,10 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  } else if (r_scause() == 12 || r_scause() == 13) {
+      hanlde_pagefault();
+  }
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
