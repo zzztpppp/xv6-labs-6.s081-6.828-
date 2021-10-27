@@ -277,6 +277,7 @@ mmap(uint64 addr, int length, int prot, int flags, int fd, int offset) {
     for (i = 0; i < NOFILE; i++) {
         if (p->vmatable[i] == 0) {
             p->vmatable[i] = v;
+            v->idx = i;
             break;
         }
         if (i == NOFILE - 1)
@@ -287,6 +288,9 @@ mmap(uint64 addr, int length, int prot, int flags, int fd, int offset) {
     v->file = f;
     v->addr = PGROUNDUP(p->sz);
     v->length = length;
+    v->flags = flags;
+    v->permission = prot;
+    v->offset = offset;
 
     // Arrange mapped region.
     growproc_lazy(length);

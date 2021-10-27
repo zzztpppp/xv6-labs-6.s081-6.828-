@@ -35,7 +35,7 @@ trapinithart(void)
 
 // Handles page store and load fault
 static void
-hanlde_pagefault() {
+handle_pagefault() {
     uint64 addr = r_stval();
     struct proc *p = myproc();
     struct vma *v;
@@ -65,7 +65,6 @@ hanlde_pagefault() {
     ilock(v->file->ip);
     readi(v->file->ip, 1, addr, addr - v->addr + v->offset, PGSIZE);
     iunlock(v->file->ip);
-
 }
 
 //
@@ -105,7 +104,7 @@ usertrap(void)
 
     syscall();
   } else if (r_scause() == 12 || r_scause() == 13) {
-      hanlde_pagefault();
+      handle_pagefault();
   }
   else if((which_dev = devintr()) != 0){
     // ok
