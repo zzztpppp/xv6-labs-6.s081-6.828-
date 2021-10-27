@@ -202,7 +202,7 @@ vma_at(uint64 addr, int clear) {
     struct vma *v;
     for (int i = 0; i < NOFILE; i++) {
         v = p->vmatable[i];
-        if (v != 0 && ( addr >= v->addr && addr <= v->addr + v->length)) {
+        if (v != 0 && ( addr >= v->addr && addr < v->addr + v->length)) {
             if (clear)
                 p->vmatable[i] = 0;
             return v;
