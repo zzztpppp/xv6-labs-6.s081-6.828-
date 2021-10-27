@@ -33,6 +33,9 @@ void            fileinit(void);
 int             fileread(struct file*, uint64, int n);
 int             filestat(struct file*, uint64 addr);
 int             filewrite(struct file*, uint64, int n);
+int             munmap(uint64 addr, uint64 length);
+void            vtableinit(void);
+uint64          mmap(uint64 addr, int length, int prot, int flags, int fd, int offset);
 
 // fs.c
 void            fsinit(int);
@@ -185,8 +188,6 @@ void            virtio_disk_init(void);
 void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
-//sysfile.c
-int             munmap(uint64 addr, uint64 length);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

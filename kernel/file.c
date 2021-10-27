@@ -19,6 +19,20 @@ struct {
   struct file file[NFILE];
 } ftable;
 
+
+struct {
+    struct spinlock lock;
+    struct vma vt[NOFILE];
+} vtable;
+
+void
+vtableinit(void) {
+    initlock(&vtable.lock, "vtable");
+    for (int i = 0; i < NOFILE; i++)
+        vtable.vt[i].free = 1;
+}
+
+
 void
 fileinit(void)
 {
@@ -180,3 +194,101 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+// Return the vma that contains this address if any.
+struct vma *
+vma_at(uint64 addr, int clear) {
+    struct proc *p = myproc();
+    struct vma *v;
+    for (int i = 0; i < NOFILE; i++) {
+        v = p->vmatable[i];
+        if (v != 0 && (v->addr >= addr && addr <= v->addr + v->length)) {
+            if (clear)
+                p->vmatable[i] = 0;
+            return v;
+        }
+    }
+    return 0;
+}
+
+
+int
+munmap(uint64 addr, uint64 length) {
+    struct vma *v;
+    // Addr must be a multiple of the page size
+    if ((addr & (PGSIZE - 1)) != 0)
+        return -1;
+
+    // All pages containing a part of the
+    // indicated range are unmapped. Assume
+    // the specified ranges are all in the same
+    // vma and will not punch a hole int he middle of
+    // the area.
+    if ((v = vma_at(addr, 0)) == 0)
+        return -1;
+
+    // Write dirty data back to file if MAP_SHARED
+    // The dirty bit check is ignored.
+    filewrite(v->file, addr, (int)length);
+
+    // Shrink vma in the unit of page
+    length = PGROUNDUP(length);
+    if (addr == v->addr)    // At the start of the vma.
+        v->addr += length;
+    v->length -= length;
+
+    uvmunmap(myproc()->pagetable, addr, length / PGSIZE, 1);
+
+    // The whole area is removed.
+    // Close the file, clear the vma.
+    if (length <= 0) {
+        fileclose(v->file);
+        acquire(&vtable.lock);
+        v->free = 1;
+        release(&vtable.lock);
+        myproc()->vmatable[v->idx]  = 0;
+    }
+    return 0;
+}
+
+uint64
+mmap(uint64 addr, int length, int prot, int flags, int fd, int offset) {
+
+    struct file *f;
+    struct vma *v;
+    struct proc *p = myproc();
+    int i;
+    uint64 oldsz;
+
+    f = p->ofile[fd];
+    oldsz = p->sz;
+
+    // Find a empty vma
+    acquire(&vtable.lock);
+    for (i = 0; i < NOFILE; i++) {
+        if (vtable.vt[i].free)
+            break;
+        if (i == NOFILE - 1)
+            return -1;
+    }
+    vtable.vt[i].free = 0;
+    release(&vtable.lock);
+    v = &vtable.vt[i];
+    // Put the vma at process's vma table.
+    for (i = 0; i < NOFILE; i++) {
+        if (p->vmatable[i] == 0) {
+            p->vmatable[i] = v;
+            break;
+        }
+        if (i == NOFILE - 1)
+            panic("Too much mapped files for the process!");
+    }
+    // Use the vma
+    filedup(f);
+    v->file = f;
+    v->addr = PGROUNDUP(p->sz);
+    v->length = length;
+
+    // Arrange mapped region.
+    growproc_lazy(length);
+    return oldsz;
+}
