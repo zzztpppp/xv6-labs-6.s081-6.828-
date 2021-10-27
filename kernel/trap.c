@@ -58,6 +58,7 @@ handle_pagefault() {
     if (v->permission | PROT_WRITE)
         perm = perm | PTE_W;
 
+    memset(pa, 0, PGSIZE);
     mappages(p->pagetable, addr, PGSIZE, (uint64)pa, (int)perm);
 
     // Fill one page with the content in the mapped file.

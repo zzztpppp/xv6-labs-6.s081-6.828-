@@ -9,6 +9,7 @@
 #include "fs.h"
 #include "spinlock.h"
 #include "sleeplock.h"
+#include "fcntl.h"
 #include "file.h"
 #include "stat.h"
 #include "proc.h"
@@ -201,7 +202,7 @@ vma_at(uint64 addr, int clear) {
     struct vma *v;
     for (int i = 0; i < NOFILE; i++) {
         v = p->vmatable[i];
-        if (v != 0 && (v->addr >= addr && addr <= v->addr + v->length)) {
+        if (v != 0 && ( addr >= v->addr && addr <= v->addr + v->length)) {
             if (clear)
                 p->vmatable[i] = 0;
             return v;
@@ -261,6 +262,10 @@ mmap(uint64 addr, int length, int prot, int flags, int fd, int offset) {
 
     f = p->ofile[fd];
     oldsz = p->sz;
+
+    // Not allowed if prot contains PROT_WRITE and flags MAP_SHARED but with file mode O_RDONLY
+    if (f->writable == 0 && (prot & PROT_WRITE) && (flags == MAP_SHARED))
+        return -1;
 
     // Find a empty vma
     acquire(&vtable.lock);
