@@ -215,6 +215,8 @@ vma_at(uint64 addr, int clear) {
 int
 munmap(uint64 addr, uint64 length) {
     struct vma *v;
+    struct proc *p = myproc();
+
     // Addr must be a multiple of the page size
     if ((addr & (PGSIZE - 1)) != 0)
         return -1;
@@ -225,11 +227,15 @@ munmap(uint64 addr, uint64 length) {
     // vma and will not punch a hole int he middle of
     // the area.
     if ((v = vma_at(addr, 0)) == 0)
-        return -1;
+        // According to `munmap` man page: It's not an error
+        // if the indicated range does not contain any
+        // mapped pages.
+        return 0;
 
     // Write dirty data back to file if MAP_SHARED
     // The dirty bit check is ignored.
-    filewrite(v->file, addr, (int)length);
+    if (v->flags == MAP_SHARED)
+        filewrite(v->file, addr, (int)length);
 
     // Shrink vma in the unit of page
     length = PGROUNDUP(length);
@@ -237,7 +243,11 @@ munmap(uint64 addr, uint64 length) {
         v->addr += length;
     v->length -= length;
 
-    uvmunmap(myproc()->pagetable, addr, length / PGSIZE, 1);
+    // If a page mapped but unused, it will never occur in the pagetable
+    for (;addr < v->addr + v->length; addr += PGSIZE) {
+        if (walkaddr(p->pagetable, addr))
+            uvmunmap(p->pagetable, addr, 1, 1);
+    }
 
     // The whole area is removed.
     // Close the file, clear the vma.
@@ -246,7 +256,7 @@ munmap(uint64 addr, uint64 length) {
         acquire(&vtable.lock);
         v->free = 1;
         release(&vtable.lock);
-        myproc()->vmatable[v->idx]  = 0;
+        p->vmatable[v->idx]  = 0;
     }
     return 0;
 }
