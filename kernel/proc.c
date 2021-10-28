@@ -307,6 +307,7 @@ fork(void)
       if ((nv = vma_alloc()) == 0)
           return -1;
       memmove(nv, pv, sizeof(struct vma));
+      filedup(nv->file);
       np->vmatable[i] = nv;
   }
 
