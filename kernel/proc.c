@@ -285,6 +285,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
+  struct vma *nv, *pv;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -298,6 +299,17 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  // Copy vma from parent to child
+  for (i = 0; i < NOFILE; i++) {
+      if ((pv = p->vmatable[i]) == 0)
+          continue;
+      if ((nv = vma_alloc()) == 0)
+          return -1;
+      memmove(nv, pv, sizeof(struct vma));
+      np->vmatable[i] = nv;
+  }
+
 
   np->parent = p;
 

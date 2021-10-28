@@ -36,6 +36,7 @@ int             filewrite(struct file*, uint64, int n);
 int             munmap(uint64 addr, uint64 length);
 void            vtableinit(void);
 uint64          mmap(uint64 addr, int length, int prot, int flags, int fd, int offset);
+struct vma *    vma_alloc(void);
 
 // fs.c
 void            fsinit(int);

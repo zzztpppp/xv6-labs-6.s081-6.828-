@@ -211,6 +211,21 @@ vma_at(uint64 addr, int clear) {
     return 0;
 }
 
+// Allocate a empty vma from the global vma table
+struct vma *
+vma_alloc(void) {
+    int i;
+    acquire(&vtable.lock);
+    for (i = 0; i < NOFILE; i++) {
+        if (vtable.vt[i].free)
+            break;
+        if (i == NOFILE - 1)
+            return 0;
+    }
+    vtable.vt[i].free = 0;
+    release(&vtable.lock);
+    return &vtable.vt[i];
+}
 
 int
 munmap(uint64 addr, uint64 length) {
@@ -278,16 +293,9 @@ mmap(uint64 addr, int length, int prot, int flags, int fd, int offset) {
         return -1;
 
     // Find a empty vma
-    acquire(&vtable.lock);
-    for (i = 0; i < NOFILE; i++) {
-        if (vtable.vt[i].free)
-            break;
-        if (i == NOFILE - 1)
-            return -1;
-    }
-    vtable.vt[i].free = 0;
-    release(&vtable.lock);
-    v = &vtable.vt[i];
+    if ((v = vma_alloc()) == 0)
+        return -1;
+
     // Put the vma at process's vma table.
     for (i = 0; i < NOFILE; i++) {
         if (p->vmatable[i] == 0) {
