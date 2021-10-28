@@ -8,5 +8,5 @@
 - [x] Lab Multithreading
 - [x] Lab Lock
 - [x] Lab File system
-- [ ] Lab mmap
+- [x] Lab mmap
 - [ ] Lab Network driver
