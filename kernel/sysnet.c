@@ -58,6 +58,7 @@ sockalloc(struct file **f, uint32 raddr, uint16 lport, uint16 rport)
   // add to list of sockets
   acquire(&lock);
   pos = sockets;
+  // Check for duplicates
   while (pos) {
     if (pos->raddr == raddr &&
         pos->lport == lport &&
@@ -67,6 +68,7 @@ sockalloc(struct file **f, uint32 raddr, uint16 lport, uint16 rport)
     }
     pos = pos->next;
   }
+  // Append to head
   si->next = sockets;
   sockets = si;
   release(&lock);
@@ -88,6 +90,11 @@ sockclose(struct sock *si)
 
   // remove from list of sockets
   acquire(&lock);
+  // Save the effort of comparing raddr, lport, rport by using
+  // a pointer of the pointer to the sockets.
+  // Also we don't have to do the messy stuff like: pos.prev.next = pos.next to delete current node.
+  // pos is the address holding `(*pos)->next`, which is the address of previous'(after the update) socket.next.
+  // So assigning to *pos changes the value of previous' socket.next.
   pos = &sockets;
   while (*pos) {
     if (*pos == si){
