@@ -155,7 +155,6 @@ e1000_recv(void)
   uint32 head = regs[E1000_RDH];
 
   // scan for any waiting packets
-  printf("Receiving!\n");
   index = (tail + 1) % RX_RING_SIZE;
   if (index == (head % RX_RING_SIZE)) {
       release(&e1000_lock);
@@ -173,7 +172,7 @@ e1000_recv(void)
   // Create a new buf for the next receiving.
   new_mbuf = mbufalloc(0);
   rx_ring[index].addr = (uint64) new_mbuf->head;
-  regs[E1000_RDT] = tail;
+  regs[E1000_RDT] = tail + 1;
   release(&e1000_lock);
 
   // Receive the current buffer.
