@@ -172,11 +172,13 @@ e1000_recv(void)
   // Create a new buf for the next receiving.
   new_mbuf = mbufalloc(0);
   rx_ring[index].addr = (uint64) new_mbuf->head;
+  rx_mbufs[index] = new_mbuf;
+  // Update  tail register state to indicate next read.
   regs[E1000_RDT] = tail + 1;
   release(&e1000_lock);
 
   // Receive the current buffer.
-  net_rx(rx_mbufs[index]);
+  net_rx(receiving_buf);
 
 }
 
