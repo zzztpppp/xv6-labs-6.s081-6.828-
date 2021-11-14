@@ -15,6 +15,7 @@ static struct mbuf *tx_mbufs[TX_RING_SIZE];
 #define RX_RING_SIZE 16
 static struct rx_desc rx_ring[RX_RING_SIZE] __attribute__((aligned(16)));
 static struct mbuf *rx_mbufs[RX_RING_SIZE];
+static struct mbuf *rxing_mbufs[RX_RING_SIZE];
 
 // remember where the e1000's registers live.
 static volatile uint32 *regs;
@@ -155,30 +156,41 @@ e1000_recv(void)
   uint32 head = regs[E1000_RDH];
 
   // scan for any waiting packets
-  index = (tail + 1) % RX_RING_SIZE;
-  if (index == (head % RX_RING_SIZE)) {
-      release(&e1000_lock);
-      return;
-  }
+  // in a single interrupt handle
+  // set aside these packets in local buffer
+  // to avoid dead lock.
+  while(1) {
+      index = (tail + 1) % RX_RING_SIZE;
+      if (index == (head % RX_RING_SIZE)) {
+          break;
+      }
 
-  desc = rx_ring[index];
-  if ((desc.status & E1000_RXD_STAT_DD) == 0) {
-      release(&e1000_lock);
-      return;
-  }
+      desc = rx_ring[index];
+      if ((desc.status & E1000_RXD_STAT_DD) == 0) {
+          continue;
+      }
 
-  receiving_buf = rx_mbufs[index];
-  receiving_buf->len = desc.length;
-  // Create a new buf for the next receiving.
-  new_mbuf = mbufalloc(0);
-  rx_ring[index].addr = (uint64) new_mbuf->head;
-  rx_mbufs[index] = new_mbuf;
-  // Update  tail register state to indicate next read.
-  regs[E1000_RDT] = tail + 1;
+      receiving_buf = rx_mbufs[index];
+      receiving_buf->len = desc.length;
+      // Create a new buf for the next receiving.
+      new_mbuf = mbufalloc(0);
+      rx_ring[index].addr = (uint64) new_mbuf->head;
+      rx_mbufs[index] = new_mbuf;
+      // Update  tail register state to indicate next read.
+      rxing_mbufs[index] = receiving_buf;
+      tail++;
+  }
+  // Update RDT pointing to next receiving message
+  regs[E1000_RDT] = tail;
   release(&e1000_lock);
 
-  // Receive the current buffer.
-  net_rx(receiving_buf);
+  // Receive all buffers collected so far.
+  for (int i = 0; i < RX_RING_SIZE; i++) {
+      if (rxing_mbufs[i] != 0) {
+          net_rx(rxing_mbufs[i]);
+          rxing_mbufs[i] = 0;
+      }
+  }
 
 }
 
