@@ -102,30 +102,33 @@ e1000_transmit(struct mbuf *m)
   // the TX descriptor ring so that the e1000 sends it. Stash
   // a pointer so that it can be freed after sending.
   //
-  struct tx_desc desc;
+  struct tx_desc *desc;
   acquire(&e1000_lock);
   uint32 tail = regs[E1000_TDT];
   // Tail index out of bounds.
-  if (tail >= TX_RING_SIZE)
+  if (tail >= TX_RING_SIZE) {
+      release(&e1000_lock);
       return -1;
-  desc = tx_ring[tail];
+  }
+  desc = &tx_ring[tail];
 
   // The E1000 has not done with previous transmission yet.
-  if ((desc.status & E1000_TXD_STAT_DD) == 0)
+  if ((desc->status & E1000_TXD_STAT_DD) == 0) {
+      release(&e1000_lock);
       return -1;
-
+  }
   // Free the last buf that was transmitted
   if (tx_mbufs[tail])
       mbuffree(tx_mbufs[tail]);
 
   // Transmit
-  desc.addr = (uint64)m->head;
-  desc.length = m->len;
+  desc->addr = (uint64)m->head;
+  desc->length = m->len;
   // We are transferring a whole packet and we want the status to be reported back
   // when the transmission is done.
-  desc.cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
+  desc->cmd = E1000_TXD_CMD_EOP | E1000_TXD_CMD_RS;
 
-  // Stash the mbuf for laler freeing
+  // Stash the mbuf for later freeing
   tx_mbufs[tail] = m;
 
   // Update next transmission pointer
@@ -144,6 +147,39 @@ e1000_recv(void)
   // Check for packets that have arrived from the e1000
   // Create and deliver an mbuf for each packet (using net_rx()).
   //
+  struct rx_desc desc;
+  struct mbuf *new_mbuf, *receiving_buf;
+  uint32 index;
+  acquire(&e1000_lock);
+  uint32 tail = regs[E1000_RDT];
+  uint32 head = regs[E1000_RDH];
+
+  // scan for any waiting packets
+  index = (tail + 1) % RX_RING_SIZE;
+  if (index == (head % RX_RING_SIZE)) {
+      release(&e1000_lock);
+      return;
+  }
+
+  desc = rx_ring[index];
+  if ((desc.status & E1000_RXD_STAT_DD) == 0) {
+      release(&e1000_lock);
+      return;
+  }
+
+  receiving_buf = rx_mbufs[index];
+  receiving_buf->len = desc.length;
+  // Create a new buf for the next receiving.
+  new_mbuf = mbufalloc(0);
+  rx_ring[index].addr = (uint64) new_mbuf->head;
+  rx_mbufs[index] = new_mbuf;
+  // Update  tail register state to indicate next read.
+  regs[E1000_RDT] = tail + 1;
+  release(&e1000_lock);
+
+  // Receive the current buffer.
+  net_rx(receiving_buf);
+
 }
 
 void

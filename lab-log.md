@@ -7,6 +7,8 @@
          `consolewrite`which calls `uartputc`
        * `user/sh` which calls `getcmd` which calls `gets`which calls `sys_read` which calls
           `fileread` which calls `consoleread` which reads characters from the buffer.
+ * We have to handle all waiting incoming packets in a single interrupt, since interrupts will pend, 
+   but they do not queue.
 * Which CPU deals with uart interrupt?
     * It depends on the policy that is configured with PLIC. For example, the PLIC may
     ask the first hart that are able to take the interrupt to do the thing.
